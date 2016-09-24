@@ -60,18 +60,15 @@ function filtout_richfs(execname)
 probe syscall.read.return
 {
   if (filtout_richfs(execname())) next;
-  timestamp=gettimeofday_us();
-  spid = sprintf("%d", pid());
-  tts = sprintf("%d", timestamp);
 
   try {
     if ($return > 0) {
       #filename=task_dentry_path(task_current(), $file->f_path->dentry, $file->f_path->mnt);
       filename=task_file_handle_d_path(task_current(), $fd);
-      printf("%c%s%c%s%c%s\n", 112, spid, 3, tts, 3, filename);
+      printf("%c%d %d %s\n", 112, pid(), gettimeofday_us(), filename);
     }
   } catch (msg) {
-    printf("%c%s%c%s%c%s\n", 115, spid, 3, tts, 3, msg);
+    printf("%c%d %d %s\n", 115, pid(), gettimeofday_us(), msg);
   }
 }
 
@@ -88,9 +85,9 @@ probe syscall.write.return
     if ($return > 0){
       #filename=task_dentry_path(task_current(), $file->f_path->dentry, $file->f_path->mnt);
       filename=task_file_handle_d_path(task_current(), $fd);
-      printf("%c%s%c%s%c%s\n", 113, spid, 3, tts, 3, filename);
+      printf("%c%d %d %s\n", 113, pid(), gettimeofday_us(), filename);
     }
   } catch (msg) {
-    printf("%c%s%c%s%c%s\n", 115, spid, 3, tts, 3, msg);
+    printf("%c%d %d %s\n", 115, pid(), gettimeofday_us(), msg);
   }
 }
