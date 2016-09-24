@@ -9,17 +9,17 @@
 
 #include <mpi.h>
 
-#include "util.h"
+#include "utils.h"
 #include "store.h"
 #include "dbkey.h"
 
 int static ALPS_DIVIDE = 2;
 
 int main(int argc, char **argv){
-  int rank;
-  
-  MPI_Init(&argc,&argv);
-  MPI_Comm_rank(MPI_COMM_WORLD, &rank);
+	int rank;
+
+	MPI_Init(&argc,&argv);
+	MPI_Comm_rank(MPI_COMM_WORLD, &rank);
 
 	/*
   char hostname[256];
@@ -46,7 +46,7 @@ int main(int argc, char **argv){
 
 			switch ((*line)){
 				case 'a':
-
+					
 					break;
 				case 'b':
 					break;
@@ -61,8 +61,7 @@ int main(int argc, char **argv){
 				case 'p':
 					break;
 				case 'q':
-					break;
-				default:
+						break;					
 
 			}
 			int target;
@@ -79,7 +78,7 @@ int main(int argc, char **argv){
 		MPI_Send(buffer, 256, MPI_CHAR, status.MPI_SOURCE, 0, MPI_COMM_WORLD);
 		
 	}
-  
-  MPI_Finalize();
-  return 0;
+
+	MPI_Finalize();
+	return 0;
 }

@@ -118,8 +118,8 @@ probe nd_syscall.execve.return
   printf("%c%s%c%s%c%s%c%s\n", 100, spid, 3, tts, 3, retstr, 3, env);
 }
 
-#probe syscall.close.return
-probe kernel.function("sys_close")
+#probe kernel.function("sys_close")
+probe syscall.close
 {
   if (filtout_richfs(execname())) next;
 
@@ -127,8 +127,8 @@ probe kernel.function("sys_close")
   tts = sprintf("%d", timestamp);
 
   try {
-  	filename=task_file_handle_d_path(task_current(), $fd);
-  	fds = sprintf("%d", $fd);
+  	filename=task_file_handle_d_path(task_current(), fd);
+  	fds = sprintf("%d", fd);
   	spid = sprintf("%d", pid());
   	if (filename == "") filename = "UNDEFINED";
 	printf("%c%s%c%s%c%s%c%s\n", 103, spid, 3, tts, 3, filename, 3, fds);
@@ -167,7 +167,8 @@ probe kernel.function("do_sys_open").return
   timestamp=gettimeofday_us();
   spid = sprintf("%d", pid());
   tts = sprintf("%d", timestamp);
-  flag = sprintf("%d", $flags);
+  #flag = sprintf("%d", $flags);
+  flag = sprintf("%d", @cast($op, "open_flags")->open_flag);
 
   #if (!errno_p($return))
   if ($return != -1)
