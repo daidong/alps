@@ -1,7 +1,4 @@
 %{
-#include <asm/unistd.h>
-#include "linux/compat_unistd.h"
-#include <linux/ipc.h>
 #include <linux/file.h>
 #include <net/sock.h>
 #include <linux/un.h>
@@ -12,26 +9,10 @@
 #ifdef STAPCONF_LINUX_UIDGID_H
 #include <linux/uidgid.h>
 #endif
-#define PR_SET_MM               35
-# define PR_SET_MM_START_CODE           1
-# define PR_SET_MM_END_CODE             2
-# define PR_SET_MM_START_DATA           3
-# define PR_SET_MM_END_DATA             4
-# define PR_SET_MM_START_STACK          5
-# define PR_SET_MM_START_BRK            6
-# define PR_SET_MM_BRK                  7
-# define PR_SET_MM_ARG_START            8
-# define PR_SET_MM_ARG_END              9
-# define PR_SET_MM_ENV_START            10
-# define PR_SET_MM_ENV_END              11
-# define PR_SET_MM_AUXV                 12
-# define PR_SET_MM_EXE_FILE             13
-# define PR_SET_MM_MAP                  14
-# define PR_SET_MM_MAP_SIZE             15
 %}
 
 function task_file_handle_d_path:string (task:long, fd:long) %{ /* pure */
-	struct task_struct *p = (struct task_struct *)((long)STAP_ARG_task);
+	struct task_struct *p = (struct task_struct *)((long)THIS->task);
 	struct files_struct *files;
 	char *page = NULL;
 	struct file *filp;
@@ -44,7 +25,7 @@ function task_file_handle_d_path:string (task:long, fd:long) %{ /* pure */
 	    // We need GFP_ATOMIC since we're inside a lock so we
 	    // can't sleep.
 	    (page = (char *)__get_free_page(GFP_ATOMIC)) &&
-	    (filp = fcheck_files(files, STAP_ARG_fd))) {
+	    (filp = fcheck_files(files, THIS->fd))) {
 
 #if LINUX_VERSION_CODE >= KERNEL_VERSION(2,6,26)
 		/* git commit 9d1bc601 */
@@ -58,7 +39,7 @@ function task_file_handle_d_path:string (task:long, fd:long) %{ /* pure */
 		}
 #endif
 		if (path && !IS_ERR(path)) {
-			snprintf(STAP_RETVALUE, MAXSTRINGLEN, "%s", path);
+			snprintf(THIS->__retvalue, MAXSTRINGLEN, "%s", path);
 		}
 	}
 	CATCH_DEREF_FAULT();
@@ -118,8 +99,8 @@ probe nd_syscall.execve.return
   printf("%c%s%c%s%c%s%c%s\n", 100, spid, 3, tts, 3, retstr, 3, env);
 }
 
-#probe kernel.function("sys_close")
-probe syscall.close
+#probe syscall.close
+probe kernel.function("sys_close")
 {
   if (filtout_richfs(execname())) next;
 
@@ -127,13 +108,13 @@ probe syscall.close
   tts = sprintf("%d", timestamp);
 
   try {
-  	filename=task_file_handle_d_path(task_current(), fd);
-  	fds = sprintf("%d", fd);
+  	filename=task_file_handle_d_path(task_current(), $fd);
+  	fds = sprintf("%d", $fd);
   	spid = sprintf("%d", pid());
   	if (filename == "") filename = "UNDEFINED";
 	printf("%c%s%c%s%c%s%c%s\n", 103, spid, 3, tts, 3, filename, 3, fds);
   } catch (msg) {
-  	printf("%c%s%c%s%c%s%c%s\n", 103, spid, 3, tts, 3, "null", 3, fds);
+  	printf("%c%s%c%s%c%s%c%s\n", 103, spid, 3, tts, 3, msg, 3, fds);
   }
 }
 
@@ -167,8 +148,7 @@ probe kernel.function("do_sys_open").return
   timestamp=gettimeofday_us();
   spid = sprintf("%d", pid());
   tts = sprintf("%d", timestamp);
-  #flag = sprintf("%d", $flags);
-  flag = sprintf("%d", @cast($op, "open_flags")->open_flag);
+  flag = sprintf("%d", $flags);
 
   #if (!errno_p($return))
   if ($return != -1)
