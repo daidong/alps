@@ -59,44 +59,29 @@ probe kprocess.create
 {
   if (filtout_richfs(execname())) next;
 
-  timestamp=gettimeofday_us()
-  sts = sprintf("%d", timestamp);
-  snpid = sprintf("%d", new_pid);
-  spid = sprintf("%d", pid());
-
   # new_pid = new process Id; pid() = current process Id,
-  printf("%c%s%c%s%c%s\n", 97, snpid, 3, sts, 3, spid);
+  printf("%c%d %d %d\n", 97, new_pid, gettimeofday_us(), pid());
 }
 
 probe syscall.exit_group
 {
   if (filtout_richfs(execname())) next;
-  timestamp = gettimeofday_us();
-  tts = sprintf("%d", timestamp);
-  spid = sprintf("%d", pid());
-  printf("%c%s%c%s\n", 98, spid, 3, tts);
+  printf("%c%d %d\n", 98, pid(), gettimeofday_us());
 }
 
 probe nd_syscall.execve
 {
   if (filtout_richfs(execname())) next;
 
-  timestamp=gettimeofday_us();
-  tts = sprintf("%d", timestamp);
-  spid = sprintf("%d", pid());
   env = sprintf("PBS_JOBID=%s;PBS_JOBNAME=%s;PBS_JOBCOOKIE=%s", env_var("PBS_JOBID"), env_var("PBS_JOBNAME"), env_var("PBS_JOBCOOKIE"));
-  printf("%c%s%c%s%c%s%c%s%c%s%c%s%c%s\n", 99, spid, 3, tts, 3, execname(), 3, argstr, 3, env, 3, filename, 3, args);
+  printf("%c%d %d %s %s %s %s %s\n", 99, pid(), gettimeofday_us(), execname(), argstr, env, filename, args);
 }
 
 probe nd_syscall.execve.return
 {
   if (filtout_richfs(execname())) next;
-
-  timestamp=gettimeofday_us();
-  tts = sprintf("%d", timestamp);
-  spid = sprintf("%d", pid());
   env = sprintf("PBS_JOBID=%s;PBS_JOBNAME=%s;PBS_JOBCOOKIE=%s", env_var("PBS_JOBID"), env_var("PBS_JOBNAME"), env_var("PBS_JOBCOOKIE"));
-  printf("%c%s%c%s%c%s%c%s\n", 100, spid, 3, tts, 3, retstr, 3, env);
+  printf("%c%d %d %s %s\n", 100, pid(), gettimeofday_us(), retstr, env);
 }
 
 #probe syscall.close
@@ -104,40 +89,14 @@ probe kernel.function("sys_close")
 {
   if (filtout_richfs(execname())) next;
 
-  timestamp=gettimeofday_us();
-  tts = sprintf("%d", timestamp);
-
   try {
   	filename=task_file_handle_d_path(task_current(), $fd);
-  	fds = sprintf("%d", $fd);
-  	spid = sprintf("%d", pid());
   	if (filename == "") filename = "UNDEFINED";
-	printf("%c%s%c%s%c%s%c%s\n", 103, spid, 3, tts, 3, filename, 3, fds);
+	  printf("%c%d %d %s %d\n", 103, pid(), gettimeofday_us(), filename, $fd);
   } catch (msg) {
-  	printf("%c%s%c%s%c%s%c%s\n", 103, spid, 3, tts, 3, msg, 3, fds);
+  	printf("%c%d %d %s %d\n", 103, pid(), gettimeofday_us(), msg, $fd);
   }
 }
-
-
-#probe syscall.close
-#{
-#  if (filtout_richfs(execname())) next;
-#
-#  try {
-#    timestamp=gettimeofday_us();
-#    tts = sprintf("%d", timestamp);
-#    spid = sprintf("%d", pid());
-#    fds = sprintf("%d", $fd);
-#  	file = @cast(task_current(), "task_struct")->files->fdt->fd[$fd];
-#  	if (file == 0) next;
-#  	filename=task_dentry_path(task_current(), @cast(file, "file")->f_path->dentry, @cast(file, "file")->f_path->mnt);
-#  	if (filename == "") filename = "UNDEFINED";
-#
-#	printf("%c%s%c%s%c%s%c%s\n", 103, spid, 3, tts, 3, filename, 3, fds);
-#  } catch (msg) {
-#  	printf("%c%s%c%s%c%s%c%s\n", 103, spid, 3, tts, 3, msg, 3, fds);
-#  }
-#}
 
 
 #probe kernel.function("do_filp_open")
@@ -145,38 +104,10 @@ probe kernel.function("sys_close")
 probe kernel.function("do_sys_open").return
 {
   if (filtout_richfs(execname())) next;
-  timestamp=gettimeofday_us();
-  spid = sprintf("%d", pid());
-  tts = sprintf("%d", timestamp);
-  flag = sprintf("%d", $flags);
 
-  #if (!errno_p($return))
   if ($return != -1)
   {
     filename=task_file_handle_d_path(task_current(), $return); #$return is the fd
-    fds = sprintf("%d", $return);
-    printf("%c%s%c%s%c%s%c%s%c%s\n", 101, spid, 3, tts, 3, filename, 3, fds, 3, flag);
+    printf("%c%d %d %s %d %d\n", 101, pid(), gettimeofday_us(), filename, $return, $flags);
   }
 }
-
-#probe kernel.function("do_filp_open").return
-#{
-#  if (filtout_richfs(execname())) next;
-#  timestamp=gettimeofday_us();
-#  spid = sprintf("%d", pid());
-#  tts = sprintf("%d", timestamp);
-#
-#  if (!errno_p($return))
-#  {
-#    filename=task_dentry_path(task_current(), $return->f_path->dentry, $return->f_path->mnt);
-#    flag = sprintf("%d", $flags);
-#    fds = sprintf("%d", $dfd);
-#    printf("%c%s%c%s%c%s%c%s%c%s\n", 101, spid, 3, tts, 3, filename, 3, fds, 3, flag);
-#
-#    #if ($flags == 0x1)  //first read
-#	 #printf("%c%s%c%s%c%s%c%s\n", 101, spid, 3, tts, 3, filename, 3, flag);
-#    #if ($flags == 0x2) //first write
-#    #	printf("%c%s%c%s%c%s%c%s\n", 101, spid, 3, tts, 3, filename, 3, flag);
-#    #if ($flags == 0x3) //first read/write
-#  }
-#}

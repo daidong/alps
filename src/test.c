@@ -1,57 +1,28 @@
-#include <stdio.h>
-#include <unistd.h>
-#include <stdlib.h>
-#include <fcntl.h>
-#include <sys/types.h>
-#include <sys/stat.h>
-#include <limits.h>
-#include <string.h>
+#include "stdio.h"
 
-#include <mpi.h>
+void main(){
 
-#include "utils.h"
-#include "store.h"
-#include "dbkey.h"
+	const char *fifo_name = "/tmp/test.binary"; //this must be a local file
+	FILE *pipe_fd;
+	ssize_t read;
+	size_t len = 0;
+	pipe_fd = fopen(fifo_name, "r");
+	char *line = NULL;
 
-int static ALPS_DIVIDE = 2;
+	int child_pid, pid, fd, flag;
+	long long timestamp;
+	char execname[128], argstr[128], args[256], env[128], filename[256], retstr[128];
 
-int main(int argc, char **argv){
-	int rank;
-
-	MPI_Init(&argc,&argv);
-	MPI_Comm_rank(MPI_COMM_WORLD, &rank);
-
+	if (pipe_fd == NULL)
+		return;
 	
-	if (rank < ALPS_DIVIDE){
-		
-		const char *fifo_name = "/tmp/test.binary"; //this must be a local file
-		
-		FILE *pipe_fd;
-		size_t len = 0;
-		ssize_t read;
-		
-		char *line = NULL;
-		int bytes_read = 0;
-		
-		pipe_fd = fopen(fifo_name, "r");
-		if (pipe_fd == NULL)
-			exit(0);
+	while ((read = getline(&line, &len, pipe_fd)) != -1){
+		char *p = line + 1;
 
-		int child_pid, pid, fd, flag;
-		long long timestamp;
-		char execname[128], argstr[128], args[128], env[128], filename[256], retstr[128];
-		
-		struct alps_exec * all_alive_execs;
-
-		while ((read = getline(&line, &len, pipe_fd)) != -1){
-			bytes_read += len;
-			char *p = (line + 1);
-
-			switch ((*line)){
+		switch ((*line)){
 				case 'a':
 					sscanf(p, "%d %lld %d\n", &child_pid, &timestamp, &pid);
 					printf("Create Process - Child-PID: %d, timestamp: %lld, Curr-PID: %d\n", child_pid, timestamp, pid);
-
 					break;
 				case 'b':
 					sscanf(p, "%d %lld\n", &pid, &timestamp);
@@ -81,23 +52,18 @@ int main(int argc, char **argv){
 					sscanf(p, "%d %lld %s\n", &pid, &timestamp, filename);
 					printf("Write - PID: %d, timestamp: %lld, filename: %s\n", pid, timestamp, filename);
 					break;
-			}
-
-			int target;
-			MPI_Send(line,strlen(line), MPI_CHAR, target, 0, MPI_COMM_WORLD);
 		}
-		
-		fclose(pipe_fd);
-	} 
-	else {
-		
-		char buffer[256];
-		MPI_Status status;
-		MPI_Recv(buffer, 256, MPI_CHAR, MPI_ANY_SOURCE, 0, MPI_COMM_WORLD, &status);
-		MPI_Send(buffer, 256, MPI_CHAR, status.MPI_SOURCE, 0, MPI_COMM_WORLD);
-		
 	}
 
-	MPI_Finalize();
-	return 0;
+	fclose(pipe_fd);
+	/*
+	char str[1024];
+	sprintf(str, "%d %d %d %d %d %s %s %s %s %s\n", 0, 1, 2, 3, 4, "execname", "argstr", "env", "filename", "retstr");
+
+	sscanf(str, "%d %d %d %d %d %s %s %s %s %s\n", &child_pid, &timestamp, &pid, &fd, &flag, 
+		execname, argstr, env, filename, retstr);
+
+	printf("%d %d %d %d %d %s %s %s %s %s\n", child_pid, timestamp, pid, fd, flag, 
+		execname, argstr, env, filename, retstr);
+	*/
 }
