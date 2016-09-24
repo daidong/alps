@@ -1,0 +1,117 @@
+%{
+#include <asm/unistd.h>
+#include "linux/compat_unistd.h"
+#include <linux/ipc.h>
+#include <linux/file.h>
+#include <net/sock.h>
+#include <linux/un.h>
+#include <linux/tcp.h>
+#ifdef CONFIG_USER_NS
+#include <linux/user_namespace.h>
+#endif
+#ifdef STAPCONF_LINUX_UIDGID_H
+#include <linux/uidgid.h>
+#endif
+#define PR_SET_MM               35
+# define PR_SET_MM_START_CODE           1
+# define PR_SET_MM_END_CODE             2
+# define PR_SET_MM_START_DATA           3
+# define PR_SET_MM_END_DATA             4
+# define PR_SET_MM_START_STACK          5
+# define PR_SET_MM_START_BRK            6
+# define PR_SET_MM_BRK                  7
+# define PR_SET_MM_ARG_START            8
+# define PR_SET_MM_ARG_END              9
+# define PR_SET_MM_ENV_START            10
+# define PR_SET_MM_ENV_END              11
+# define PR_SET_MM_AUXV                 12
+# define PR_SET_MM_EXE_FILE             13
+# define PR_SET_MM_MAP                  14
+# define PR_SET_MM_MAP_SIZE             15
+%}
+
+function task_file_handle_d_path:string (task:long, fd:long) %{ /* pure */
+	struct task_struct *p = (struct task_struct *)((long)STAP_ARG_task);
+	struct files_struct *files;
+	char *page = NULL;
+	struct file *filp;
+	struct dentry *dentry;
+	struct vfsmount *vfsmnt;
+	char *path = NULL;
+
+	rcu_read_lock();
+	if ((files = kread(&p->files)) &&
+	    // We need GFP_ATOMIC since we're inside a lock so we
+	    // can't sleep.
+	    (page = (char *)__get_free_page(GFP_ATOMIC)) &&
+	    (filp = fcheck_files(files, STAP_ARG_fd))) {
+
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(2,6,26)
+		/* git commit 9d1bc601 */
+		path = d_path(&filp->f_path, page, PAGE_SIZE);
+#else
+		dentry = kread(&filp->f_dentry);
+		vfsmnt = kread(&filp->f_vfsmnt);
+
+		if (dentry && vfsmnt) {
+			path = d_path(dentry, vfsmnt, page, PAGE_SIZE);
+		}
+#endif
+		if (path && !IS_ERR(path)) {
+			snprintf(STAP_RETVALUE, MAXSTRINGLEN, "%s", path);
+		}
+	}
+	CATCH_DEREF_FAULT();
+
+	if (page) free_page((unsigned long)page);
+
+	rcu_read_unlock();
+%}
+
+
+function filtout_richfs(execname)
+{
+  if (execname == "stapio" || execname == "stap" ||execname == "alps")
+  return 1;
+}
+
+#probe vfs.read.return
+probe syscall.read.return
+{
+  if (filtout_richfs(execname())) next;
+  timestamp=gettimeofday_us();
+  spid = sprintf("%d", pid());
+  tts = sprintf("%d", timestamp);
+
+  try {
+    if ($return > 0) {
+      #filename=task_dentry_path(task_current(), $file->f_path->dentry, $file->f_path->mnt);
+      #filename=sprintf("%d", task_file_handle_i_node(task_current(), $fd));
+      filename=task_file_handle_d_path(task_current(), $fd);
+      printf("%c%s%c%s%c%s\n", 112, spid, 3, tts, 3, filename);
+    }
+  } catch (msg) {
+    printf("%c%s%c%s%c%s\n", 115, spid, 3, tts, 3, "null");
+  }
+}
+
+#probe vfs.write.return
+probe syscall.write.return
+{
+  if (filtout_richfs(execname())) next;
+
+  timestamp=gettimeofday_us();
+  spid = sprintf("%d", pid());
+  tts = sprintf("%d", timestamp);
+
+  try {
+    if ($return > 0){
+      #filename=task_dentry_path(task_current(), $file->f_path->dentry, $file->f_path->mnt);
+  	  #filename=sprintf("%d", task_file_handle_i_node(task_current(), $fd));
+      filename=task_file_handle_d_path(task_current(), $fd);
+      printf("%c%s%c%s%c%s\n", 113, spid, 3, tts, 3, filename);
+    }
+  } catch (msg) {
+    printf("%c%s%c%s%c%s\n", 115, spid, 3, tts, 3, "null");
+  }
+}

@@ -1,3 +1,6 @@
+.DS_Store
+alps
+
 # Object files
 *.o
 *.ko
