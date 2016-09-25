@@ -40,7 +40,7 @@ int init_db(char *DB_FILE, char *ENV_DIR){
 		return -1;
 	}
 
-	dbp->set_bt_compare(dbp, compare_dbkey_v6); //set the comparator, must before open
+	dbp->set_bt_compare(dbp, compare_dbkey_v4); //set the comparator, must before open
 
 	flags = DB_CREATE; //DB_EXCL, DB_RDONLY, DB_TRUNCATE; DB->get_open_flags()
 	ret = dbp->open(dbp,

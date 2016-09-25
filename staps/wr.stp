@@ -76,11 +76,7 @@ probe syscall.read.return
 probe syscall.write.return
 {
   if (filtout_richfs(execname())) next;
-
-  timestamp=gettimeofday_ms();
-  spid = sprintf("%d", pid());
-  tts = sprintf("%d", timestamp);
-
+  
   try {
     if ($return > 0){
       #filename=task_dentry_path(task_current(), $file->f_path->dentry, $file->f_path->mnt);

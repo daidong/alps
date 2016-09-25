@@ -1,6 +1,6 @@
 #include "utils.h"
 
-int hash(char *str, int total){
+int hash_str(char *str, int total){
 										 
 	unsigned long hash = 5381;
 	int c;
@@ -11,7 +11,7 @@ int hash(char *str, int total){
 	return hash % total;
 }
 
-int hash(long long pid, int total) {
+int hash_long(long long pid, int total) {
 	return pid % total;
 }
 
