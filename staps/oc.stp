@@ -60,13 +60,13 @@ probe kprocess.create
   if (filtout_richfs(execname())) next;
 
   # new_pid = new process Id; pid() = current process Id,
-  printf("%c%d %d %d\n", 97, new_pid, gettimeofday_us(), pid());
+  printf("%c%d %d %d\n", 97, new_pid, gettimeofday_ms(), pid());
 }
 
 probe syscall.exit_group
 {
   if (filtout_richfs(execname())) next;
-  printf("%c%d %d\n", 98, pid(), gettimeofday_us());
+  printf("%c%d %d\n", 98, pid(), gettimeofday_ms());
 }
 
 probe nd_syscall.execve
@@ -74,14 +74,14 @@ probe nd_syscall.execve
   if (filtout_richfs(execname())) next;
 
   env = sprintf("PBS_JOBID=%s;PBS_JOBNAME=%s;PBS_JOBCOOKIE=%s", env_var("PBS_JOBID"), env_var("PBS_JOBNAME"), env_var("PBS_JOBCOOKIE"));
-  printf("%c%d %d %s %s %s %s %s\n", 99, pid(), gettimeofday_us(), execname(), argstr, env, filename, args);
+  printf("%c%d %d %s %s %s %s %s\n", 99, pid(), gettimeofday_ms(), execname(), argstr, env, filename, args);
 }
 
 probe nd_syscall.execve.return
 {
   if (filtout_richfs(execname())) next;
   env = sprintf("PBS_JOBID=%s;PBS_JOBNAME=%s;PBS_JOBCOOKIE=%s", env_var("PBS_JOBID"), env_var("PBS_JOBNAME"), env_var("PBS_JOBCOOKIE"));
-  printf("%c%d %d %s %s\n", 100, pid(), gettimeofday_us(), retstr, env);
+  printf("%c%d %d %s %s\n", 100, pid(), gettimeofday_ms(), retstr, env);
 }
 
 #probe syscall.close
@@ -92,9 +92,9 @@ probe kernel.function("sys_close")
   try {
   	filename=task_file_handle_d_path(task_current(), $fd);
   	if (filename == "") filename = "UNDEFINED";
-	  printf("%c%d %d %s %d\n", 103, pid(), gettimeofday_us(), filename, $fd);
+	  printf("%c%d %d %s %d\n", 103, pid(), gettimeofday_ms(), filename, $fd);
   } catch (msg) {
-  	printf("%c%d %d %s %d\n", 103, pid(), gettimeofday_us(), msg, $fd);
+  	printf("%c%d %d %s %d\n", 103, pid(), gettimeofday_ms(), msg, $fd);
   }
 }
 
@@ -108,6 +108,6 @@ probe kernel.function("do_sys_open").return
   if ($return != -1)
   {
     filename=task_file_handle_d_path(task_current(), $return); #$return is the fd
-    printf("%c%d %d %s %d %d\n", 101, pid(), gettimeofday_us(), filename, $return, $flags);
+    printf("%c%d %d %s %d %d\n", 101, pid(), gettimeofday_ms(), filename, $return, $flags);
   }
 }

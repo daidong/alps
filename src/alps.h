@@ -6,10 +6,10 @@ struct alps_exec {
 
 	int pid, parent_pid;
 	long long start_ts, end_ts;
-	char exename[128], argstr[128], env[128], args[128], retstr[128], exefile[256];
+	char execname[128], argstr[128], env[128], args[128], retstr[128], execfile[128];
 	int isExit, isRE;
 
-	struct alps_exec *child, *next;
+	struct alps_exec *next;
 }
 
 struct alps_exec_file {
@@ -19,5 +19,13 @@ struct alps_exec_file {
 	char filename[256];
 	int access_type; // 0:READ; 1:WRITE; 2:READWRITE; 3:OPEN; 4:CLOSE;
 }
+
+typedef struct alps_message_s {
+	int message_header;
+	long long pid, child_pid;
+	long long ts1, ts2;
+	char execname[128], argstr[128], env[128], retstr[128], execfile[128];
+	int fd, flag;
+} alps_message;
 
 #endif

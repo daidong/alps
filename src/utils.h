@@ -1,7 +1,6 @@
 #ifndef _UTILS_H_
 
-unsigned long hash(char *str, 
-									 unsigned long starter, 
-									 unsigned long total);
+int hash(char *str, int total);
+int hash(long long pid, int total);
 
 #endif
