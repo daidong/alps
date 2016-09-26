@@ -66,7 +66,8 @@ void close_db(){
 	//dbp->remove(dbp, dbf, NULL, 0);
 }
 
-int insert(char *src, u_int32_t ssize, char *dst, u_int32_t dsize, u_int32_t type, u_int64_t ts, char *val, u_int32_t vsize){
+int insert(char *src, u_int32_t ssize, char *dst, u_int32_t dsize, u_int32_t type, u_int64_t ts, 
+	char *val, u_int32_t vsize){
 	DBKey dbkey;
 	Slice _a = {ssize, src};
 	Slice _b = {dsize, dst};

@@ -12,6 +12,17 @@
 #define EVENT_FIRST_WRITE 115
 #define EVENT_LAST_RW 116
 
+const static int EDGE_PARENT_CHILD = 1;
+const static int EDGE_ATTR = 0
+
+const static char ATTR_EXEC_NAME[16] = "execname";
+const static char ATTR_ARG_STR[16] = "argstr";
+const static char ATTR_ENV_STR[16] = "env";
+const static char ATTR_RET_STR[16] = "retstr";
+const static char ATTR_EXEC_FILE[16] = "execfile";
+const static char ATTR_START_TS[16] = "start_ts";
+const static char ATTR_END_TS[16] = "end_ts";
+
 struct alps_exec {
 	int unique_id;
 	int pid, parent_pid;
