@@ -18,7 +18,7 @@
 #define UNIQUE_PID(ts, rank, pid)	((ts << 32) + (rank << 16) + pid)  //Every 49 days, it may repeat 
 #define BUCKET_NUM 128
 
-int static ALPS_DIVIDE = 2;
+int static ALPS_DIVIDE = 1;
 
 int main(int argc, char **argv){
 	int rank;
@@ -124,6 +124,7 @@ int main(int argc, char **argv){
 
 					bucket = unique_pid % BUCKET_NUM;
 					ptr = all_alive_execs[bucket];
+					
 					while (ptr != NULL) {
 						if (ptr -> unique_id == unique_pid){
 							ptr->end_ts = timestamp;
