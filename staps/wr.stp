@@ -56,6 +56,21 @@ function filtout_richfs(execname)
   return 1;
 }
 
+probe syscall.read
+{
+  if (filtout_richfs(execname())) next;
+
+  try {
+    if ($return > 0) {
+      #filename=task_dentry_path(task_current(), $file->f_path->dentry, $file->f_path->mnt);
+      filename=task_file_handle_d_path(task_current(), $fd);
+      printf("%c%d %d %s\n", 104, pid(), gettimeofday_ms(), filename);
+    }
+  } catch (msg) {
+    printf("%c%d %d %s\n", 120, pid(), gettimeofday_ms(), msg);
+  }
+}
+
 #probe vfs.read.return
 probe syscall.read.return
 {
@@ -65,10 +80,25 @@ probe syscall.read.return
     if ($return > 0) {
       #filename=task_dentry_path(task_current(), $file->f_path->dentry, $file->f_path->mnt);
       filename=task_file_handle_d_path(task_current(), $fd);
-      printf("%c%d %d %s\n", 112, pid(), gettimeofday_ms(), filename);
+      printf("%c%d %d %s\n", 105, pid(), gettimeofday_ms(), filename);
     }
   } catch (msg) {
-    printf("%c%d %d %s\n", 115, pid(), gettimeofday_ms(), msg);
+    printf("%c%d %d %s\n", 120, pid(), gettimeofday_ms(), msg);
+  }
+}
+
+probe syscall.write
+{
+  if (filtout_richfs(execname())) next;
+
+  try {
+    if ($return > 0){
+      #filename=task_dentry_path(task_current(), $file->f_path->dentry, $file->f_path->mnt);
+      filename=task_file_handle_d_path(task_current(), $fd);
+      printf("%c%d %d %s\n", 106, pid(), gettimeofday_ms(), filename);
+    }
+  } catch (msg) {
+    printf("%c%d %d %s\n", 120, pid(), gettimeofday_ms(), msg);
   }
 }
 
@@ -76,14 +106,14 @@ probe syscall.read.return
 probe syscall.write.return
 {
   if (filtout_richfs(execname())) next;
-  
+
   try {
     if ($return > 0){
       #filename=task_dentry_path(task_current(), $file->f_path->dentry, $file->f_path->mnt);
       filename=task_file_handle_d_path(task_current(), $fd);
-      printf("%c%d %d %s\n", 113, pid(), gettimeofday_ms(), filename);
+      printf("%c%d %d %s\n", 107, pid(), gettimeofday_ms(), filename);
     }
   } catch (msg) {
-    printf("%c%d %d %s\n", 115, pid(), gettimeofday_ms(), msg);
+    printf("%c%d %d %s\n", 120, pid(), gettimeofday_ms(), msg);
   }
 }
