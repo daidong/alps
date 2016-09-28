@@ -16,6 +16,7 @@
 #include "alps.h"
 
 #define UNIQUE_PID(ts, rank, pid)	((ts << 32) + (rank << 16) + pid)  //Every 49 days, it may repeat 
+
 #define BUCKET_NUM 128
 
 //#define DEBUG_LEVEL_1
@@ -24,6 +25,16 @@
 //#define DEBUG_LEVEL_4
 
 int static ALPS_DIVIDE = 1;
+
+static long long UNIQUE_FID(file, rank){
+	if (strstr(file, "/mnt/orangefs") == file || strstr(file, "/proj") == file)
+		return hash_file(file);
+	else {
+		char new_file[256];
+		sprintf(new_file, "%s:%d", file, rank);
+		return hash_file(new_file);
+	}									
+}
 
 int main(int argc, char **argv){
 	int rank;
@@ -400,7 +411,6 @@ int main(int argc, char **argv){
 
 					unique_pid = ptr->unique_id;
 					target_builder = hash_str(filename, total_size - ALPS_DIVIDE) + ALPS_DIVIDE;
-					
 
 					strcpy(ptr->last_write, filename);
 					ptr->last_write_ts = timestamp;
@@ -437,13 +447,18 @@ int main(int argc, char **argv){
 		sprintf(db_env, "%s%d.env", "/tmp/db", rank);
 		init_db(db_file, db_env);
 
+		struct alps_version all_accessed_files[BUCKET_NUM];
+
 		while (1){
 			alps_message recv;
 			MPI_Status status;
 			MPI_Recv(&recv, 1, alps_message_type, MPI_ANY_SOURCE, 0, MPI_COMM_WORLD, &status);
 			//MPI_Send(buffer, 256, MPI_CHAR, status.MPI_SOURCE, 0, MPI_COMM_WORLD);
 
-			long long unique_pid, unique_child_pid;
+			long long unique_pid, unique_child_pid, unique_fid;
+			int bucket;
+			struct alps_version *pre_ptr, *ptr;
+			struct alps_version *internal_pre_ptr, *internal_ptr;
 		
 			switch (recv.message_header) {
 				case EVENT_PROCESS_CREAT:
@@ -454,80 +469,296 @@ int main(int argc, char **argv){
 							unique_pid, unique_child_pid, recv.ts1);
 					#endif
 					insert((char *) &unique_pid, sizeof(long long), (char *) &unique_child_pid, sizeof(long long),
-						EDGE_PARENT_CHILD, recv.ts1, (char *) &pid, sizeof(long long));
+						EDGE_PARENT_CHILD, recv.ts1, (char *) &recv.pid, sizeof(long long));
 
 					break;
+
 				case EVENT_PROCESS_EXIT:
 					unique_pid = recv.pid;
 					#ifdef DEBUG_LEVEL_4
-						printf("[BUILDER] Process %lld Start at %lld. Exit at %lld with 
-							Metadata: execname (%s), argstr(%s), env(%s), retstr(%s), execfile(%s)\n", 
+						printf("[BUILDER] Process %lld Start at %lld. Exit at %lld with Metadata: execname (%s), argstr(%s), env(%s), retstr(%s), execfile(%s)\n", 
 							unique_pid, recv.ts1, recv.ts2, 
 							recv.execname, recv.argstr, recv.env, recv.retstr, recv.execfile);
 					#endif
-					insert((char *) &unique_pid, sizeof(long long), ATTR_EXEC_NAME, 16, 
+					insert((char *) &unique_pid, sizeof(long long), (char *) &ATTR_EXEC_NAME, sizeof(long long), 
 						EDGE_ATTR, recv.ts1, recv.execname, strlen(recv.execname));
 
-					insert((char *) &unique_pid, sizeof(long long), ATTR_ARG_STR, 16, 
+					insert((char *) &unique_pid, sizeof(long long), (char *) &ATTR_ARG_STR, sizeof(long long), 
 						EDGE_ATTR, recv.ts1, recv.argstr, strlen(recv.argstr));
 					
-					insert((char *) &unique_pid, sizeof(long long), ATTR_ENV_STR, 16, 
+					insert((char *) &unique_pid, sizeof(long long), (char *) &ATTR_ENV_STR, sizeof(long long), 
 						EDGE_ATTR, recv.ts1, recv.env, strlen(recv.env));
 					
-					insert((char *) &unique_pid, sizeof(long long), ATTR_RET_STR, 16, 
+					insert((char *) &unique_pid, sizeof(long long), (char *) &ATTR_RET_STR, sizeof(long long), 
 						EDGE_ATTR, recv.ts1, recv.retstr, strlen(recv.retstr));
 
-					insert((char *) &unique_pid, sizeof(long long), ATTR_EXEC_FILE, 16, 
+					insert((char *) &unique_pid, sizeof(long long), (char *) &ATTR_EXEC_FILE, sizeof(long long), 
 						EDGE_ATTR, recv.ts1, recv.execfile, strlen(recv.execfile));
 
-					insert((char *) &unique_pid, sizeof(long long), ATTR_START_TS, 16, 
-						EDGE_ATTR, recv.ts1, (char *) &recv.ts1, sizeof(long long));
-					insert((char *) &unique_pid, sizeof(long long), ATTR_END_TS, 16, 
-						EDGE_ATTR, recv.ts1, (char *) &recv.ts2, sizeof(long long));
+					char sts1[32], sts2[32];
+					sprintf(sts1, "%lld", recv.ts1);
+					sprintf(sts2, "%lld", recv.ts2);
+					
+					insert((char *) &unique_pid, sizeof(long long), (char *) &ATTR_START_TS, sizeof(long long), 
+						EDGE_ATTR, recv.ts1, sts1, strlen(sts1));
+					insert((char *) &unique_pid, sizeof(long long), (char *) &ATTR_END_TS, sizeof(long long), 
+						EDGE_ATTR, recv.ts1, sts2, strlen(sts2));
 					
 					break;
-					
+
 				case EVENT_OPEN_RDONLY:
-					unique_pid = recv.pid;
 					#ifdef DEBUG_LEVEL_4
-						printf("[BUILDER Process %lld read Open file %s at %lld\n", unique_pid, recv.execfile, recv.ts1);
+						printf("[BUILDER Process %lld read Open file %s at %lld\n", recv.pid, recv.execfile, recv.ts1);
 					#endif
+
+					unique_pid = recv.pid;
+					unique_fid = UNIQUE_FID(recv.execfile, rank);
+					bucket = unique_fid % BUCKET_NUM;
+					pre_ptr = &all_accessed_files[bucket];
+					ptr = all_accessed_files[bucket].hash_next;
+
+					while (ptr != NULL) {
+						if (ptr->unique_fid == unique_fid) break;
+						pre_ptr = ptr;
+						ptr = ptr->next;
+					}
+
+					//something bad happened; should just break;
+					if (ptr == NULL) break;
+
+					internal_ptr = ptr->version_next;
+					internal_pre_ptr = internal_ptr;
+					
+					while (internal_ptr != NULL){
+						if (internal_ptr->timestamp > recv.ts1) break;
+						internal_pre_ptr = internal_ptr;
+						internal_ptr = internal_ptr->version_next;
+					}
+
+					internal_ptr = (struct alps_version *) malloc (sizeof(struct alps_version));
+					internal_ptr->unique_fid = unique_fid;
+					internal_ptr->unique_pid = unique_pid;
+					internal_ptr->timestamp = recv.ts1;
+					internal_ptr->event = EVENT_OPEN_RDONLY;
+					internal_ptr->hash_next = NULL;
+					internal_ptr->version_next = NULL;
+					
+					// insert the new element;
+					internal_ptr->version_next = internal_pre_ptr->version_next;
+					internal_pre_ptr->version_next = internal_ptr;
+
+					/* delete other OPEN or First_Read events from the same process, 
+					 * this is not necessary to me
+					internal_ptr = ptr->version_next;
+					internal_pre_ptr = internal_ptr;
+					while (internal_ptr != NULL){
+						if (internal_ptr->timestamp == recv.ts1) break;
+						if (internal_ptr->unique_pid == unique_pid
+							&& (internal_ptr->event == EVENT_OPEN_RDONLY)){
+							internal_pre_ptr->version_next = internal_ptr->version_next;
+							struct alps_version *free_ptr = internal_ptr;
+							internal_ptr = internal_ptr->version_next;
+							free(free_ptr);
+						}
+					}
+					*/
 					break;
+
 				case EVENT_OPEN_RDWR:
-					unique_pid = recv.pid;
 					#ifdef DEBUG_LEVEL_4
-						printf("[BUILDER Process %lld write Open file %s at %lld\n", unique_pid, recv.execfile, recv.ts1);
+						printf("[BUILDER Process %lld write Open file %s at %lld\n", recv.pid, recv.execfile, recv.ts1);
 					#endif
+				
+					unique_pid = recv.pid;
+					unique_fid = UNIQUE_FID(recv.execfile, rank);
+					bucket = unique_fid % BUCKET_NUM;
+					pre_ptr = &all_accessed_files[bucket];
+					ptr = all_accessed_files[bucket].hash_next;
+
+					while (ptr != NULL) {
+						if (ptr->unique_fid == unique_fid) break;
+						pre_ptr = ptr;
+						ptr = ptr->next;
+					}
+					
+					// create a empty header node
+					if (ptr == NULL) {  
+						ptr = (struct alps_version *) malloc (sizeof(struct alps_version));
+						pre_ptr->hash_next = ptr;
+						ptr->unique_fid = unique_fid;
+						ptr->timestamp = 0;
+						ptr->version = 0;
+						ptr->event = 0;
+						ptr->hash_next = NULL;
+						ptr->version_next = NULL;
+					}
+
+					internal_ptr = ptr->version_next;
+					internal_pre_ptr = internal_ptr;
+					
+					while (internal_ptr != NULL){
+						if (internal_ptr->timestamp > recv.ts1) break;
+						internal_pre_ptr = internal_ptr;
+						internal_ptr = internal_ptr->version_next;
+					}
+					
+					// find the location to insert the new event;
+					internal_ptr = (struct alps_version *) malloc (sizeof(struct alps_version));
+					internal_ptr->unique_fid = unique_fid;
+					internal_ptr->unique_pid = unique_pid;
+					internal_ptr->timestamp = recv.ts1;
+					internal_ptr->event = EVENT_OPEN_RDWR;
+					internal_ptr->hash_next = NULL;
+					internal_ptr->version_next = NULL;
+					
+					// insert the new element;
+					internal_ptr->version_next = internal_pre_ptr->version_next;
+					internal_pre_ptr->version_next = internal_ptr;
+					
 					break;
+
 				case EVENT_CLOSE:
 					unique_pid = recv.pid;
 					#ifdef DEBUG_LEVEL_4
 						printf("[BUILDER Process %lld Close file %s at %lld\n", unique_pid, recv.execfile, recv.ts1);
 					#endif
-					break;						
+					break;
+
 				case EVENT_READ:
 					unique_pid = recv.pid;
 					#ifdef DEBUG_LEVEL_4
 						printf("[BUILDER Process %lld Read file %s at %lld\n", unique_pid, recv.execfile, recv.ts1);
 					#endif
 					break;
+
 				case EVENT_WRITE:
-					unique_pid = recv.pid;
 					#ifdef DEBUG_LEVEL_4
-						printf("[BUILDER Process %lld Write file %s at %lld\n", unique_pid, recv.execfile, recv.ts1);
+						printf("[BUILDER Process %lld Write file %s at %lld\n", recv.pid, recv.execfile, recv.ts1);
 					#endif
+					unique_pid = recv.pid;
+					
 					break;
+
 				case EVENT_FIRST_READ:
-					unique_pid = recv.pid;
 					#ifdef DEBUG_LEVEL_4
-						printf("[BUILDER Process %lld First Read file %s at %lld\n", unique_pid, recv.execfile, recv.ts1);
+						printf("[BUILDER Process %lld First Read file %s at %lld\n", recv.pid, recv.execfile, recv.ts1);
 					#endif
+
+					unique_pid = recv.pid;
+					unique_fid = UNIQUE_FID(recv.execfile, rank);
+					bucket = unique_fid % BUCKET_NUM;
+					pre_ptr = &all_accessed_files[bucket];
+					ptr = all_accessed_files[bucket].hash_next;
+
+					while (ptr != NULL) {
+						if (ptr->unique_fid == unique_fid) break;
+						pre_ptr = ptr;
+						ptr = ptr->next;
+					}
+
+					//something bad happened; should just break;
+					if (ptr == NULL) break;
+
+					internal_ptr = ptr->version_next;
+					internal_pre_ptr = internal_ptr;
+					
+					while (internal_ptr != NULL){
+						if (internal_ptr->timestamp > recv.ts1) break;
+						internal_pre_ptr = internal_ptr;
+						internal_ptr = internal_ptr->version_next;
+					}
+
+					internal_ptr = (struct alps_version *) malloc (sizeof(struct alps_version));
+					internal_ptr->unique_fid = unique_fid;
+					internal_ptr->unique_pid = unique_pid;
+					internal_ptr->timestamp = recv.ts1;
+					internal_ptr->event = EVENT_FIRST_READ;
+					internal_ptr->hash_next = NULL;
+					internal_ptr->version_next = NULL;
+					
+					// insert the new element;
+					internal_ptr->version_next = internal_pre_ptr->version_next;
+					internal_pre_ptr->version_next = internal_ptr;
+
+					//delete the OPEN event from the same process, 
+					internal_ptr = ptr->version_next;
+					internal_pre_ptr = internal_ptr;
+					while (internal_ptr != NULL){
+						if (internal_ptr->timestamp == recv.ts1) break;
+						if (internal_ptr->unique_pid == unique_pid
+							&& internal_ptr->event == EVENT_OPEN_RDONLY){
+							internal_pre_ptr->version_next = internal_ptr->version_next;
+							struct alps_version *free_ptr = internal_ptr;
+							internal_ptr = internal_ptr->version_next;
+							free(free_ptr);
+						}
+					}
 					break;
+
 				case EVENT_FIRST_WRITE:
-					unique_pid = recv.pid;
 					#ifdef DEBUG_LEVEL_4
-						printf("[BUILDER Process %lld First Write file %s at %lld\n", unique_pid, recv.execfile, recv.ts1);
+						printf("[BUILDER Process %lld First Write file %s at %lld\n", recv.pid, recv.execfile, recv.ts1);
 					#endif
+
+					unique_pid = recv.pid;
+					unique_fid = UNIQUE_FID(recv.execfile, rank);
+					bucket = unique_fid % BUCKET_NUM;
+					pre_ptr = &all_accessed_files[bucket];
+					ptr = all_accessed_files[bucket].hash_next;
+
+					while (ptr != NULL) {
+						if (ptr->unique_fid == unique_fid) break;
+						pre_ptr = ptr;
+						ptr = ptr->next;
+					}
+					
+					// create an empty header node
+					if (ptr == NULL) {  
+						ptr = (struct alps_version *) malloc (sizeof(struct alps_version));
+						pre_ptr->hash_next = ptr;
+						ptr->unique_fid = unique_fid;
+						ptr->timestamp = 0;
+						ptr->version = 0;
+						ptr->event = 0;
+						ptr->hash_next = NULL;
+						ptr->version_next = NULL;
+					}
+
+					internal_ptr = ptr->version_next;
+					internal_pre_ptr = internal_ptr;
+					
+					while (internal_ptr != NULL){
+						if (internal_ptr->timestamp > recv.ts1) break;
+						internal_pre_ptr = internal_ptr;
+						internal_ptr = internal_ptr->version_next;
+					}
+					
+					internal_ptr = (struct alps_version *) malloc (sizeof(struct alps_version));
+					internal_ptr->unique_fid = unique_fid;
+					internal_ptr->unique_pid = unique_pid;
+					internal_ptr->timestamp = recv.ts1;
+					internal_ptr->event = EVENT_FIRST_WRITE;
+					internal_ptr->hash_next = NULL;
+					internal_ptr->version_next = NULL;
+					
+					// insert the new element;
+					internal_ptr->version_next = internal_pre_ptr->version_next;
+					internal_pre_ptr->version_next = internal_ptr;
+
+					//delete other OPEN or First_Write events from the same process, 
+					internal_ptr = ptr->version_next;
+					internal_pre_ptr = internal_ptr;
+					while (internal_ptr != NULL){
+						if (internal_ptr->timestamp == recv.ts1) break;
+						if (internal_ptr->unique_pid == unique_pid
+							&& internal_ptr->event == EVENT_OPEN_RDWR){
+							internal_pre_ptr->version_next = internal_ptr->version_next;
+							struct alps_version *free_ptr = internal_ptr;
+							internal_ptr = internal_ptr->version_next;
+							free(free_ptr);
+						}
+					}
+
 					break;
 				case EVENT_LAST_RW:
 					unique_pid = recv.pid;

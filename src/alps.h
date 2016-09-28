@@ -13,18 +13,20 @@
 #define EVENT_LAST_RW 116
 
 const static int EDGE_PARENT_CHILD = 1;
-const static int EDGE_ATTR = 0
+const static int EDGE_ATTR = 0;
 
-const static char ATTR_EXEC_NAME[16] = "execname";
-const static char ATTR_ARG_STR[16] = "argstr";
-const static char ATTR_ENV_STR[16] = "env";
-const static char ATTR_RET_STR[16] = "retstr";
-const static char ATTR_EXEC_FILE[16] = "execfile";
-const static char ATTR_START_TS[16] = "start_ts";
-const static char ATTR_END_TS[16] = "end_ts";
+const static int ATTR_EXEC_NAME = 10;
+const static int ATTR_ARG_STR = 11;
+const static int ATTR_ENV_STR = 12;
+const static int ATTR_RET_STR = 13;
+const static int ATTR_EXEC_FILE = 14;
+const static int ATTR_START_TS = 15;
+const static int ATTR_END_TS = 16;
+
+const static int CLOCK_SKEW 100; //maximal clock skew is 100ms
 
 struct alps_exec {
-	int unique_id;
+	long long unique_id;
 	int pid, parent_pid;
 	long long start_ts, end_ts;
 	char execname[128], argstr[128], env[128], args[128], retstr[128], execfile[128];
@@ -39,6 +41,17 @@ struct alps_exec_file {
 	int alps_exec_id;
 	char filename[256];
 	int access_type; // 0:READ; 1:WRITE; 2:READWRITE; 3:OPEN; 4:CLOSE;
+};
+
+struct alps_version {
+	long long unique_fid;
+	long long unique_pid;
+	long long timestamp;
+
+	int version;
+	int event;
+
+	struct alps_version *hash_next, *version_next;
 };
 
 typedef struct alps_message_s {

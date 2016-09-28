@@ -1,7 +1,16 @@
 #include "stdio.h"
+#include "store.h"
 
 void main(){
 
+	int rank = 1;
+	char db_file[32], db_env[32];
+	sprintf(db_file, "%s%d.file", "/tmp/db", rank);
+	sprintf(db_env, "%s%d.env", "/tmp/db", rank);
+	init_db(db_file, db_env);
+
+	iterate_print();
+	/*
 	const char *fifo_name = "/tmp/test.binary"; //this must be a local file
 	FILE *pipe_fd;
 	ssize_t read;
@@ -56,6 +65,9 @@ void main(){
 	}
 
 	fclose(pipe_fd);
+	*/
+
+
 	/*
 	char str[1024];
 	sprintf(str, "%d %d %d %d %d %s %s %s %s %s\n", 0, 1, 2, 3, 4, "execname", "argstr", "env", "filename", "retstr");

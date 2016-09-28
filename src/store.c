@@ -66,8 +66,7 @@ void close_db(){
 	//dbp->remove(dbp, dbf, NULL, 0);
 }
 
-int insert(char *src, u_int32_t ssize, char *dst, u_int32_t dsize, u_int32_t type, u_int64_t ts, 
-	char *val, u_int32_t vsize){
+int insert(char *src, u_int32_t ssize, char *dst, u_int32_t dsize, u_int32_t type, u_int64_t ts, char *val, u_int32_t vsize){
 	DBKey dbkey;
 	Slice _a = {ssize, src};
 	Slice _b = {dsize, dst};
@@ -134,4 +133,38 @@ int del(char *src, u_int32_t ssize, char *dst, u_int32_t dsize, u_int32_t type, 
 	key.data = decompose(&dbkey, &key.size);
 	ret = dbp->del(dbp, NULL, &key, 0);
 	return ret;
+}
+
+void iterate_print(){
+	DBC *dbcp;
+	DBT key, data;
+	int close_db, close_dbc, ret;
+
+	close_db = close_dbc = 0;
+
+	/* Acquire a cursor for the database. */
+	if ((ret = dbp->cursor(dbp, NULL, &dbcp, 0)) != 0) {
+		dbp->err(dbp, ret, "DB->cursor");
+		return;
+	}
+
+	/* Initialize the key/data return pair. */
+	memset(&key, 0, sizeof(DBT));
+	memset(&data, 0, sizeof(DBT));
+
+	/* Walk through the database and print out the key/data pairs. */
+	while ((ret = dbcp->c_get(dbcp, &key, &data, DB_NEXT)) == 0){
+		DBKey *dbkey = build(&key);
+
+		printf("src[%d]-dst[%d]-ts[%lld]-type[%d] : %.*s\n",
+			(*(int *)dbkey->src.data), (*(int *)dbkey->dst.data), (long long) dbkey->ts, dbkey->type,
+		    (int)data.size, (char *)data.data);
+	}
+
+	if (ret != DB_NOTFOUND) {
+		dbp->err(dbp, ret, "DBcursor->get");
+		return;
+	}
+
+
 }
