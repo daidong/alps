@@ -32,7 +32,7 @@ const static int ATTR_EXEC_FILE = 14;
 const static int ATTR_START_TS = 15;
 const static int ATTR_END_TS = 16;
 
-const static int CLOCK_SKEW 100; //maximal clock skew is 100ms
+const static int CLOCK_SKEW = 100; //maximal clock skew is 100ms
 
 struct alps_exec {
 	long long unique_id;
