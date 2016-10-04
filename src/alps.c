@@ -38,7 +38,7 @@ static long long UNIQUE_FID(char *file, int rank) {
 	}
 }
 
-void builder_file_event_start(int event, alps_message recv, int rank) {
+static void builder_file_event_start(int event, alps_message recv, int rank) {
 	long long unique_pid = recv.pid;
 	long long unique_fid = UNIQUE_FID(recv.execfile, rank);
 	int bucket = unique_fid % BUCKET_NUM;
@@ -129,7 +129,7 @@ void builder_file_event_start(int event, alps_message recv, int rank) {
 	}
 }
 
-void builder_file_event_end(int event, alps_message recv, int rank) {
+static void builder_file_event_end(int event, alps_message recv, int rank) {
 
 	long long unique_pid = recv.pid;
 	long long unique_fid = UNIQUE_FID(recv.execfile, rank);
@@ -154,40 +154,35 @@ void builder_file_event_end(int event, alps_message recv, int rank) {
 	if (event == EVENT_WRITE_START) {
 		/* look for whether there is an event_start for this Write
 		 * this can be OPEN_RDWR, FIRST_WRITE.
-		 * WRITE is not possible as this is write_start.
+		 * WRITE is not possible for EVENT_WRITE_START.
 		 * @TODO: WRITE might be possible, but the case is very trick.
 		 */
-
 		int write_paired = 0;
 		while (internal_ptr != NULL) {
-			if (internal_ptr->timestamp > recv.ts1)
+			if (internal_ptr->timestamp > recv.ts1) {
+				if (write_paired == 1) {
+					internal_pre_ptr->version_next = internal_ptr->version_next;
+					/*
+					 * this is a write edge between PID to given file, with correct version.
+					 */
+					insert((char *) &unique_pid, sizeof(long long),
+							(char *) &unique_fid, sizeof(long long), EDGE_WRITE,
+							(long long) internal_ptr->version, recv.execfile,
+							strlen(recv.execfile));
+					free(internal_ptr);
+				}
 				break;
+			}
 			if (internal_ptr->unique_pid == unique_pid
 					&& (internal_ptr->event == EVENT_OPEN_RDWR
 							|| internal_ptr->event == EVENT_FIRST_WRITE)) {
-				internal_pre_ptr->version_next = internal_ptr->version_next;
-				struct alps_version *free_ptr = internal_ptr;
-				internal_ptr = internal_ptr->version_next;
-				free(free_ptr);
 				write_paired = 1;
-				break;
 			}
 			internal_pre_ptr = internal_ptr;
 			internal_ptr = internal_ptr->version_next;
 		}
 
-		if (write_paired == 1) { //find out
-			internal_ptr = ptr->version_next;
-			internal_pre_ptr = internal_ptr;
-			while (internal_ptr != NULL) {
-				if (internal_ptr->timestamp > recv.ts1)
-					break;
-				internal_pre_ptr = internal_ptr;
-				internal_ptr = internal_ptr->version_next;
-			}
-			int latest_version = internal_ptr->version;
-
-		} else {  //no paired write
+		if (write_paired == 0) { //find out
 			internal_ptr = (struct alps_version *) malloc(
 					sizeof(struct alps_version));
 			internal_ptr->unique_fid = unique_fid;
@@ -196,12 +191,95 @@ void builder_file_event_end(int event, alps_message recv, int rank) {
 			internal_ptr->event = EVENT_WRITE_START;
 			internal_ptr->hash_next = NULL;
 			internal_ptr->version_next = NULL;
+			//@TODO: we simply increase the version. Interleaved optimization has not been done yet.
+			internal_ptr->version = internal_pre_ptr->version + 1;
 
 			// insert the new element;
 			internal_ptr->version_next = internal_pre_ptr->version_next;
 			internal_pre_ptr->version_next = internal_ptr;
 		}
 	}
+
+	if (event == EVENT_WRITE_END) {
+		/* look for whether there is an event_start for this Write_END
+		 * this can be OPEN_RDWR, FIRST_WRITE, or WRITE.
+		 */
+		int write_paired = 0;
+		while (internal_ptr != NULL) {
+			if (internal_ptr->timestamp > recv.ts1) {
+				if (write_paired == 1) {
+					internal_pre_ptr->version_next = internal_ptr->version_next;
+					//this is a write edge between PID to given file, with correct version.
+					insert((char *) &unique_pid, sizeof(long long),
+							(char *) &unique_fid, sizeof(long long), EDGE_WRITE,
+							(long long) internal_ptr->version, recv.execfile,
+							strlen(recv.execfile));
+					free(internal_ptr);
+				}
+				break;
+			}
+			if (internal_ptr->unique_pid == unique_pid
+					&& (internal_ptr->event == EVENT_OPEN_RDWR
+							|| internal_ptr->event == EVENT_FIRST_WRITE
+							|| internal_ptr->event == EVENT_WRITE_START))
+				write_paired = 1;
+
+			internal_pre_ptr = internal_ptr;
+			internal_ptr = internal_ptr->version_next;
+		}
+
+		// WRITE_END must pair something. If there is nothing to pair,
+		// something is wrong. Print and see what is happening.
+		if (write_paired == 0) {
+			printf("ERROR: WRITE_END (%lld:%s:%lld) does not pair anything\n",
+					unique_pid, recv.execfile, recv.ts1);
+		}
+	}
+
+	//This two events can only have one. It matches to OPEN or READ/WRITE
+	if (event == EVENT_LAST_RW || event == EVENT_CLOSE) {
+		/* look for whether there is an event_start for this LAST_RW or CLOSE
+		 * this can be OPEN_RDWR/OPEN_RDONLY, FIRST_WRITE/READ, or WRITE/READ.
+		 */
+		int write_paired = 0;
+		long long read_end_time = recv.ts1;
+		long long write_end_time = recv.ts2;
+		if (event == EVENT_CLOSE)
+			write_end_time = recv.ts1;
+
+		//READ
+		while (internal_ptr != NULL) {
+			if (internal_ptr->timestamp > read_end_time) {
+				if (write_paired == 1) {
+					internal_pre_ptr->version_next = internal_ptr->version_next;
+					//this is a write edge between PID to given file, with correct version.
+					insert((char *) &unique_pid, sizeof(long long),
+							(char *) &unique_fid, sizeof(long long), EDGE_WRITE,
+							(long long) internal_ptr->version, recv.execfile,
+							strlen(recv.execfile));
+					free(internal_ptr);
+				}
+				break;
+			}
+			if (internal_ptr->unique_pid == unique_pid
+					&& (internal_ptr->event == EVENT_OPEN_RDWR
+							|| internal_ptr->event == EVENT_OPEN_RDONLY
+							|| internal_ptr->event == EVENT_FIRST_READ
+							|| internal_ptr->event == EVENT_READ_START))
+				write_paired = 1;
+
+			internal_pre_ptr = internal_ptr;
+			internal_ptr = internal_ptr->version_next;
+		}
+
+		// WRITE_END must pair something. If there is nothing to pair,
+		// something is wrong. Print and see what is happening.
+		if (write_paired == 0) {
+			printf("ERROR: WRITE_END (%lld:%s:%lld) does not pair anything\n",
+					unique_pid, recv.execfile, recv.ts1);
+		}
+	}
+
 }
 
 int main(int argc, char **argv) {
@@ -216,8 +294,8 @@ int main(int argc, char **argv) {
 	const int items = 12;
 	int block_length[12] = { 1, 1, 1, 1, 1, 128, 128, 128, 128, 128, 1, 1 };
 	MPI_Datatype types[12] = { MPI_INT, MPI_LONG_LONG, MPI_LONG_LONG,
-			MPI_LONG_LONG, MPI_LONG_LONG,
-			MPI_CHAR, MPI_CHAR, MPI_CHAR, MPI_CHAR, MPI_CHAR, MPI_INT, MPI_INT };
+	MPI_LONG_LONG, MPI_LONG_LONG,
+	MPI_CHAR, MPI_CHAR, MPI_CHAR, MPI_CHAR, MPI_CHAR, MPI_INT, MPI_INT };
 	MPI_Datatype alps_message_type;
 	MPI_Aint offsets[12];
 	offsets[0] = offsetof(alps_message, message_header);
@@ -303,7 +381,7 @@ int main(int argc, char **argv) {
 				msg.child_pid = unique_child_pid;
 				msg.ts1 = timestamp;
 				MPI_Send(&msg, 1, alps_message_type, target_builder, 0,
-						MPI_COMM_WORLD);
+				MPI_COMM_WORLD);
 
 				break;
 			case EVENT_PROCESS_EXIT:
@@ -350,7 +428,7 @@ int main(int argc, char **argv) {
 						target_builder, pid, timestamp);
 #endif
 				MPI_Send(&msg, 1, alps_message_type, target_builder, 0,
-						MPI_COMM_WORLD);
+				MPI_COMM_WORLD);
 
 				//remove ptr from the list
 				pre_ptr->next = ptr->next;
@@ -456,7 +534,7 @@ int main(int argc, char **argv) {
 							target_builder, pid, filename, timestamp);
 #endif
 					MPI_Send(&msg, 1, alps_message_type, target_builder, 0,
-							MPI_COMM_WORLD);
+					MPI_COMM_WORLD);
 				}
 
 				break;
@@ -495,28 +573,24 @@ int main(int argc, char **argv) {
 							target_builder, pid, filename, timestamp);
 #endif
 					MPI_Send(&msg, 1, alps_message_type, target_builder, 0,
-							MPI_COMM_WORLD);
+					MPI_COMM_WORLD);
 
 				} else if (gran == 1) {
 					/* If no LAST_READ or LAST_WRITE, we should send out the CLOSE event to guarantee to end the events*/
-					// @TODO: not sure about previous comment. check it later.
 					msg.message_header = EVENT_LAST_RW;
 					msg.pid = unique_pid;
+					strcpy(msg.execfile, filename);
 
 					if (ptr->last_read[0] != '\0') {
 						msg.ts1 = ptr->last_read_ts;
-						strcpy(msg.execfile, ptr->last_read);
 					} else {
 						msg.ts1 = timestamp;
-						strcpy(msg.execfile, filename);
 					}
 
 					if (ptr->last_write[0] != '\0') {
 						msg.ts2 = ptr->last_write_ts;
-						strcpy(msg.retstr, ptr->last_write);
 					} else {
 						msg.ts2 = timestamp;
-						strcpy(msg.retstr, filename);
 					}
 
 #ifdef DEBUG_LEVEL_2
@@ -524,7 +598,7 @@ int main(int argc, char **argv) {
 							target_builder, pid, filename, timestamp);
 #endif
 					MPI_Send(&msg, 1, alps_message_type, target_builder, 0,
-							MPI_COMM_WORLD);
+					MPI_COMM_WORLD);
 				}
 
 				break;
@@ -583,7 +657,7 @@ int main(int argc, char **argv) {
 #endif
 
 				MPI_Send(&msg, 1, alps_message_type, target_builder, 0,
-						MPI_COMM_WORLD);
+				MPI_COMM_WORLD);
 				break;
 
 			case EVENT_READ_END:
@@ -637,7 +711,7 @@ int main(int argc, char **argv) {
 #endif
 
 					MPI_Send(&msg, 1, alps_message_type, target_builder, 0,
-							MPI_COMM_WORLD);
+					MPI_COMM_WORLD);
 				}
 
 				break;
@@ -694,7 +768,7 @@ int main(int argc, char **argv) {
 						target_builder, pid, filename, timestamp);
 #endif
 				MPI_Send(&msg, 1, alps_message_type, target_builder, 0,
-						MPI_COMM_WORLD);
+				MPI_COMM_WORLD);
 				break;
 			case EVENT_WRITE_END:
 				if (gran == 0)
@@ -744,7 +818,7 @@ int main(int argc, char **argv) {
 							target_builder, pid, filename, timestamp);
 #endif
 					MPI_Send(&msg, 1, alps_message_type, target_builder, 0,
-							MPI_COMM_WORLD);
+					MPI_COMM_WORLD);
 				}
 				break;
 			}
@@ -761,7 +835,7 @@ int main(int argc, char **argv) {
 			alps_message recv;
 			MPI_Status status;
 			MPI_Recv(&recv, 1, alps_message_type, MPI_ANY_SOURCE, 0,
-					MPI_COMM_WORLD, &status);
+			MPI_COMM_WORLD, &status);
 			//MPI_Send(buffer, 256, MPI_CHAR, status.MPI_SOURCE, 0, MPI_COMM_WORLD);
 
 			long long unique_pid, unique_child_pid, unique_fid;

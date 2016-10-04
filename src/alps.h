@@ -23,6 +23,7 @@
 
 const static int EDGE_PARENT_CHILD = 1;
 const static int EDGE_ATTR = 0;
+const static int EDGE_WRITE = 2;
 
 const static int ATTR_EXEC_NAME = 10;
 const static int ATTR_ARG_STR = 11;
