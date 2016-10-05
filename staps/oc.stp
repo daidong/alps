@@ -108,6 +108,7 @@ probe kernel.function("do_sys_open").return
   if ($return != -1)
   {
     filename=task_file_handle_d_path(task_current(), $return); #$return is the fd
+    if (filename == "") filename = "UNDEFINED";
     printf("%c%d %d %s %d %d\n", 101, pid(), gettimeofday_ms(), filename, $return, $flags);
   }
 }

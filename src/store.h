@@ -8,5 +8,6 @@ int insert(char *src, u_int32_t ssize, char *dst, u_int32_t dsize, u_int32_t typ
 char* get(char *src, u_int32_t ssize, char *dst, u_int32_t dsize, u_int32_t type, u_int64_t ts, u_int32_t *vsize);
 int del(char *src, u_int32_t ssize, char *dst, u_int32_t dsize, u_int32_t type, u_int64_t ts);
 void iterate_print();
+void close_and_remove_db(const char *db_env, const char *db_file);
 
 #endif

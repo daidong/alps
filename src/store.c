@@ -26,9 +26,9 @@ int init_db(char *DB_FILE, char *ENV_DIR){
 	env_flags = DB_CREATE |    /* If the environment does not exist, create it. */
 				DB_INIT_MPOOL; /* Initialize the in-memory cache. */
 	ret = Env->open(Env,
-					  ENV_DIR,
-					  env_flags,
-					  0);
+					ENV_DIR,
+					env_flags,
+					0);
 	if (ret != 0) {
 		fprintf(stderr, "Environment open failed: %s", db_strerror(ret));
 		return -1;
@@ -51,7 +51,7 @@ int init_db(char *DB_FILE, char *ENV_DIR){
 					flags,
 					0);
 	if (ret != 0) {
-		fprintf(stderr, "Database open failed: %s", db_strerror(ret));
+		fprintf(stderr, "My Database open failed: %s\n", db_strerror(ret));
 		return -1;
 	}
 	return ret;
@@ -66,6 +66,21 @@ void close_db(){
 	//dbp->remove(dbp, dbf, NULL, 0);
 }
 
+void close_and_remove_db(const char *db_env, const char *db_file){
+	
+	if (dbp != NULL)
+		dbp->close(dbp, 0);
+
+	char file_full_path[64];
+	sprintf(file_full_path, "%s/%s", db_env, db_file);
+	printf("db_file:%s\n", file_full_path);
+
+	dbp->remove(dbp, file_full_path, NULL, 0);
+
+	if (Env != NULL)
+		Env->close(Env, 0);
+}
+
 int insert(char *src, u_int32_t ssize, char *dst, u_int32_t dsize, u_int32_t type, u_int64_t ts, char *val, u_int32_t vsize){
 	DBKey dbkey;
 	Slice _a = {ssize, src};
@@ -74,22 +89,27 @@ int insert(char *src, u_int32_t ssize, char *dst, u_int32_t dsize, u_int32_t typ
 	dbkey.dst = _b;
 	dbkey.ts = ts;
 	dbkey.type = type;
-	int ret;
 
 	DBT key, value;
 	/* Zero out the DBTs before using them. */
 	memset(&key, 0, sizeof(DBT));
 	memset(&value, 0, sizeof(DBT));
 
-	key.data = decompose(&dbkey, &key.size);
-
 	value.size = vsize;
 	value.data = val;
 
-	ret = dbp->put(dbp, NULL, &key, &value, DB_NOOVERWRITE);
+	key.data = (void *)decompose(&dbkey, &key.size);
+	DBKey *check_dbkey = build(&key);
+	printf("src[%d]-dst[%d]-ts[%lld]-type[%d] : %.*s\n",
+			(*(int *)check_dbkey->src.data), 
+			(*(int *)check_dbkey->dst.data), 
+			(long long) check_dbkey->ts, 
+			(int) check_dbkey->type,
+		    (int) value.size, (char *)value.data);
+
+	int ret = dbp->put(dbp, NULL, &key, &value, DB_NOOVERWRITE);
 	if (ret == DB_KEYEXIST) {
-	    dbp->err(dbp, ret,
-	      "Put failed because key already exists");
+	    dbp->err(dbp, ret, "Put failed because key already exists");
 	}
 	return ret;
 }
@@ -165,6 +185,4 @@ void iterate_print(){
 		dbp->err(dbp, ret, "DBcursor->get");
 		return;
 	}
-
-
 }

@@ -24,7 +24,7 @@ DBKey* build(const DBT *a){
 char *decompose(DBKey* key, u_int32_t *size){
 	u_int32_t total = key->src.size + sizeof(u_int16_t) * 2 + key->dst.size + sizeof(u_int32_t) + sizeof(u_int64_t);
 	* size = total;
-	char *p = malloc(total);
+	char *p = malloc(total * sizeof(char));
 	memcpy(p, &key->src.size, sizeof(u_int16_t));
 	memcpy(p + sizeof(u_int16_t), key->src.data, key->src.size);
 
