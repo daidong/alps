@@ -99,6 +99,7 @@ int insert(char *src, u_int32_t ssize, char *dst, u_int32_t dsize, u_int32_t typ
 	value.data = val;
 
 	key.data = (void *)decompose(&dbkey, &key.size);
+	/*
 	DBKey *check_dbkey = build(&key);
 	printf("src[%d]-dst[%d]-ts[%lld]-type[%d] : %.*s\n",
 			(*(int *)check_dbkey->src.data), 
@@ -106,7 +107,7 @@ int insert(char *src, u_int32_t ssize, char *dst, u_int32_t dsize, u_int32_t typ
 			(long long) check_dbkey->ts, 
 			(int) check_dbkey->type,
 		    (int) value.size, (char *)value.data);
-
+	*/
 	int ret = dbp->put(dbp, NULL, &key, &value, DB_NOOVERWRITE);
 	if (ret == DB_KEYEXIST) {
 	    dbp->err(dbp, ret, "Put failed because key already exists");

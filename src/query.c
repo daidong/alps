@@ -1,7 +1,7 @@
 #include "stdio.h"
 #include "store.h"
 
-void main(){
+void main(int argc, char **argv){
 
 	int rank = 1;
 	char db_file[32], db_env[32];
