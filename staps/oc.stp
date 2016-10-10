@@ -92,9 +92,9 @@ probe kernel.function("sys_close")
   try {
   	filename=task_file_handle_d_path(task_current(), $fd);
   	if (filename == "") filename = "UNDEFINED";
-	  printf("%c%d %d %s %d\n", 103, pid(), gettimeofday_ms(), filename, $fd);
+	  printf("%c%d %d %s %d\n", 104, pid(), gettimeofday_ms(), filename, $fd);
   } catch (msg) {
-  	printf("%c%d %d %s %d\n", 103, pid(), gettimeofday_ms(), msg, $fd);
+  	printf("%c%d %d %s %d\n", 104, pid(), gettimeofday_ms(), msg, $fd);
   }
 }
 

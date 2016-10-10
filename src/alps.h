@@ -1,6 +1,16 @@
 #ifndef _ALPS_H
 #define _ALPS_H
 
+#define BUCKET_NUM 128
+#define STR_MAX_LEN 256 //file name size; argstr size; path size;
+
+//#define DEBUG_AGG_LEVEL_1
+//#define DEBUG_AGG_LEVEL_2
+//#define DEBUG_BUILDER_LEVEL_1
+//#define DEBUG_BUILDER_LEVEL_2
+
+#define ALPS_DIVIDE 1
+
 #define EVENT_PROCESS_CREAT 97
 #define EVENT_PROCESS_EXIT 98
 #define EVENT_EXECVE_START 99
@@ -13,10 +23,11 @@
 #define EVENT_CLOSE 104
 #define EVENT_CLOSE_RDONLY 105
 #define EVENT_CLOSE_WRONLY 106
-#define EVENT_READ_START 107
-#define EVENT_READ_END 108
-#define EVENT_WRITE_START 109
-#define EVENT_WRITE_END 110
+#define EVENT_CLOSE_RDWR 107
+#define EVENT_READ_START 108
+#define EVENT_READ_END 109
+#define EVENT_WRITE_START 110
+#define EVENT_WRITE_END 111
 
 #define EVENT_FIRST_READ 114
 #define EVENT_FIRST_WRITE 115
@@ -42,30 +53,44 @@ const static int ATTR_EXEC_FILE = 104;
 const static int ATTR_START_TS = 105;
 const static int ATTR_END_TS = 106;
 
+const static int ACCESS_BIT_LAST_WRITE = 0;
+const static int ACCESS_BIT_LAST_READ = 1;
+const static int ACCESS_BIT_FIRST_WRITE = 2;
+const static int ACCESS_BIT_FIRST_READ = 3;
+const static int ACCESS_BIT_OPEN_RDWR = 4;
+const static int ACCESS_BIT_OPEN_WRONLY = 5;
+const static int ACCESS_BIT_OPEN_RDONLY = 6;
+
 const static int CLOCK_SKEW = 100; //maximal clock skew is 100ms
 const static int TOLERABLE_DELAY = 1000; //maximal tolerable delay is 1000ms = 1s
 
+struct file_access {
+	char file_name[STR_MAX_LEN];
+	long long ts;
+	int flag; //6 OPEN_RDONLY; 5 OPEN_WRONLY; 4 OPEN_RDWR; 3 FIRST_READ; 2 FIRST_WRITE; 1 LAST_READ; 0 LAST_WRITE
+	struct file_access *next;
+};
+
 struct alps_exec {
-	long long unique_id;
+	unsigned long long unique_id;
 	int pid, parent_pid;
 	long long start_ts, end_ts;
-	char execname[128], argstr[128], env[128], args[128], retstr[128], execfile[128];
-	int isExit, isRE;
-	char first_read[256], first_write[256], last_read[256], last_write[256];
-	int first_read_ts, first_write_ts, last_read_ts, last_write_ts;
+	char execname[STR_MAX_LEN], argstr[STR_MAX_LEN], env[STR_MAX_LEN];
+	char args[STR_MAX_LEN], retstr[STR_MAX_LEN], execfile[STR_MAX_LEN];
+	struct file_access all_opened_files[BUCKET_NUM];
 	struct alps_exec *next;
 };
 
 struct alps_exec_file {
 	long long ts;
 	int alps_exec_id;
-	char filename[256];
+	char filename[STR_MAX_LEN];
 	int access_type; // 0:READ; 1:WRITE; 2:READWRITE; 3:OPEN; 4:CLOSE;
 };
 
 struct alps_version {
-	long long unique_fid;
-	long long unique_pid;
+	unsigned long long unique_fid;
+	unsigned long long unique_pid;
 	long long timestamp;
 
 	int version;
@@ -77,9 +102,9 @@ struct alps_version {
 
 typedef struct alps_message_s {
 	int message_header;
-	long long pid, child_pid;
+	unsigned long long pid, child_pid;
 	long long ts1, ts2;
-	char execname[128], argstr[128], env[128], retstr[128], execfile[128];
+	char execname[STR_MAX_LEN], argstr[STR_MAX_LEN], env[STR_MAX_LEN], retstr[STR_MAX_LEN], execfile[STR_MAX_LEN];
 	int fd, flag;
 } alps_message;
 

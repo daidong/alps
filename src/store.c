@@ -110,7 +110,7 @@ int insert(char *src, u_int32_t ssize, char *dst, u_int32_t dsize, u_int32_t typ
 	*/
 	int ret = dbp->put(dbp, NULL, &key, &value, DB_NOOVERWRITE);
 	if (ret == DB_KEYEXIST) {
-	    dbp->err(dbp, ret, "Put failed because key already exists");
+	    //dbp->err(dbp, ret, "Put failed because key already exists");
 	}
 	return ret;
 }
@@ -177,8 +177,10 @@ void iterate_print(){
 	while ((ret = dbcp->c_get(dbcp, &key, &data, DB_NEXT)) == 0){
 		DBKey *dbkey = build(&key);
 
-		printf("src[%d]-dst[%d]-ts[%lld]-type[%d] : %.*s\n",
-			(*(int *)dbkey->src.data), (*(int *)dbkey->dst.data), (long long) dbkey->ts, dbkey->type,
+		printf("src[%llu]-dst[%llu]-ts[%lld]-type[%d] : %.*s\n",
+			((*(unsigned long long *)dbkey->src.data) & 0xFFFF), 
+			((*(unsigned long long *)dbkey->dst.data) & 0xFFFF), 
+			(long long) dbkey->ts, dbkey->type,
 		    (int)data.size, (char *)data.data);
 	}
 
