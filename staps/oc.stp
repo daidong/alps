@@ -1,3 +1,5 @@
+global pidmap;
+
 %{
 #include <linux/file.h>
 #include <net/sock.h>
@@ -54,11 +56,16 @@ function filtout_richfs(execname)
   if (execname == "stapio" || execname == "stap" ||execname == "alps")
   return 1;
 }
+function filtout_p()
+{
+  if (pid() in pidmap) return 0;
+  else return 1;
+}
 
 probe kprocess.create
 {
   if (filtout_richfs(execname())) next;
-
+  pidmap[new_pid] = 1;
   # new_pid = new process Id; pid() = current process Id,
   printf("%c%d %d %d\n", 97, new_pid, gettimeofday_ms(), pid());
 }
@@ -66,13 +73,15 @@ probe kprocess.create
 probe syscall.exit_group
 {
   if (filtout_richfs(execname())) next;
+  if (filtout_p()) next;
+  delete pidmap[pid()];
   printf("%c%d %d\n", 98, pid(), gettimeofday_ms());
 }
 
 probe nd_syscall.execve
 {
   if (filtout_richfs(execname())) next;
-
+  if (filtout_p()) next;
   env = sprintf("PBS_JOBID=%s;PBS_JOBNAME=%s;PBS_JOBCOOKIE=%s", env_var("PBS_JOBID"), env_var("PBS_JOBNAME"), env_var("PBS_JOBCOOKIE"));
   printf("%c%d %d %s %s %s %s %s\n", 99, pid(), gettimeofday_ms(), execname(), argstr, env, filename, args);
 }
@@ -80,6 +89,7 @@ probe nd_syscall.execve
 probe nd_syscall.execve.return
 {
   if (filtout_richfs(execname())) next;
+  if (filtout_p()) next;
   env = sprintf("PBS_JOBID=%s;PBS_JOBNAME=%s;PBS_JOBCOOKIE=%s", env_var("PBS_JOBID"), env_var("PBS_JOBNAME"), env_var("PBS_JOBCOOKIE"));
   printf("%c%d %d %s %s\n", 100, pid(), gettimeofday_ms(), retstr, env);
 }
@@ -88,6 +98,7 @@ probe nd_syscall.execve.return
 probe kernel.function("sys_close")
 {
   if (filtout_richfs(execname())) next;
+  if (filtout_p()) next;
 
   try {
   	filename=task_file_handle_d_path(task_current(), $fd);
@@ -104,6 +115,7 @@ probe kernel.function("sys_close")
 probe kernel.function("do_sys_open").return
 {
   if (filtout_richfs(execname())) next;
+  if (filtout_p()) next;
 
   if ($return != -1)
   {

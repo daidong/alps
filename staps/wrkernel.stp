@@ -1,4 +1,6 @@
 global pidmap;
+global firstr, firstw;
+global lastr, lastw;
 
 %{
 #include <linux/file.h>
@@ -77,6 +79,7 @@ probe syscall.exit_group
   if (filtout_richfs(execname())) next;
   if (filtout_p()) next;
   delete pidmap[pid()];
+  
   printf("%c%d %d\n", 98, pid(), gettimeofday_ms());
 }
 
@@ -119,11 +122,34 @@ probe kernel.function("sys_close")
   if (filtout_p()) next;
 
   try {
-  	filename=task_file_handle_d_path(task_current(), $fd);
-  	if (filename == "") filename = "UNDEFINED";
-	  printf("%c%d %d %s %d\n", 104, pid(), gettimeofday_ms(), filename, $fd);
+  	
+	# First Read
+	if ([pid(), $fd] in firstr){
+		printf("%c%d %d %d\n", 114, pid(), firstr[pid(), $fd], $fd);
+		delete firstr[pid(), $fd];
+	}
+	# First Write
+	if ([pid(), $fd] in firstw) {
+		printf("%c%d %d %d\n", 115, pid(), firstw[pid(), $fd], $fd);
+		delete firstw[pid(), $fd];
+	}
+	# Last Read
+    if ([pid(), $fd] in lastr){
+    	printf("%c%d %d %d\n", 116, pid(), lastr[pid(), $fd], $fd);
+    	delete lastr[pid(), $fd];
+    }
+	# Last Write
+    if ([pid(), $fd] in lastw){
+    	printf("%c%d %d %d\n", 117, pid(), lastw[pid(), $fd], $fd);
+    	delete lastw[pid(), $fd];
+    }
+    
+    filename=task_file_handle_d_path(task_current(), $fd);
+    if (filename == "") filename = "UNDEFINED";
+    printf("%c%d %d %s %d\n", 104, pid(), gettimeofday_ms(), filename, $fd);
+    	
   } catch (msg) {
-  	printf("%c%d %d %s %d\n", 104, pid(), gettimeofday_ms(), msg, $fd);
+  	printf("%c%d %d %s %d\n", 120, pid(), gettimeofday_ms(), msg, $fd);
   }
 }
 
@@ -133,8 +159,9 @@ probe syscall.read
   if (filtout_p()) next;
 
   try {
-	#filename=task_file_handle_d_path(task_current(), $fd);
-    printf("%c%d %d %d\n", 108, pid(), gettimeofday_ms(), $fd);
+	ts = gettimeofday_ms();
+	if (!([pid(), $fd] in firstr))
+		firstr[pid(), $fd] = ts;
   } catch (msg) {
     printf("%c%d %d %s\n", 120, pid(), gettimeofday_ms(), msg);
   }
@@ -148,8 +175,8 @@ probe syscall.read.return
 
   try {
     if ($return > 0) {
- 	  #filename=task_file_handle_d_path(task_current(), $fd);
-      printf("%c%d %d %d\n", 109, pid(), gettimeofday_ms(), $fd);
+      ts = gettimeofday_ms();
+      lastr[pid(), $fd] = ts
     }
   } catch (msg) {
     printf("%c%d %d %s\n", 120, pid(), gettimeofday_ms(), msg);
@@ -162,8 +189,9 @@ probe syscall.write
   if (filtout_p()) next;
 
   try {
-	#filename=task_file_handle_d_path(task_current(), $fd);
-    printf("%c%d %d %d\n", 110, pid(), gettimeofday_ms(), $fd);
+	ts = gettimeofday_ms();
+	if (!([pid(), $fd] in firstw))
+		firstw[pid(), $fd] = ts;
   } catch (msg) {
     printf("%c%d %d %s\n", 120, pid(), gettimeofday_ms(), msg);
   }
@@ -177,8 +205,8 @@ probe syscall.write.return
 
   try {
     if ($return > 0){
-	  #filename=task_file_handle_d_path(task_current(), $fd);
-      printf("%c%d %d %d\n", 111, pid(), gettimeofday_ms(), $fd);
+      ts = gettimeofday_ms();
+      lastw[pid(), $fd] = ts;
     }
   } catch (msg) {
     printf("%c%d %d %s\n", 120, pid(), gettimeofday_ms(), msg);
