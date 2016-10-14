@@ -123,33 +123,36 @@ probe kernel.function("sys_close")
 
   try {
   	
+	fr_ts = 0;
+	lr_ts = 0;
+	fw_ts = 0;
+	lw_ts = 0;
+	
 	# First Read
 	if ([pid(), $fd] in firstr){
-		printf("%c%d %d %d\n", 114, pid(), firstr[pid(), $fd], $fd);
+		fr_ts = firstr[pid(), $fd];
 		delete firstr[pid(), $fd];
 	}
 	# First Write
 	if ([pid(), $fd] in firstw) {
-		printf("%c%d %d %d\n", 115, pid(), firstw[pid(), $fd], $fd);
+		fw_ts = firstw[pid(), $fd];
 		delete firstw[pid(), $fd];
 	}
 	# Last Read
     if ([pid(), $fd] in lastr){
-    	printf("%c%d %d %d\n", 116, pid(), lastr[pid(), $fd], $fd);
+    	lr_ts = lastr[pid(), $fd];
     	delete lastr[pid(), $fd];
     }
 	# Last Write
     if ([pid(), $fd] in lastw){
-    	printf("%c%d %d %d\n", 117, pid(), lastw[pid(), $fd], $fd);
+    	lw_ts = lastw[pid(), $fd];
     	delete lastw[pid(), $fd];
     }
     
-    filename=task_file_handle_d_path(task_current(), $fd);
-    if (filename == "") filename = "UNDEFINED";
-    printf("%c%d %d %s %d\n", 104, pid(), gettimeofday_ms(), filename, $fd);
+	printf("%c%d %d %d %d %d %d %d\n", 105, pid(), gettimeofday_ms(), $fd, fr_ts, lr_ts, fw_ts, lw_ts);
     	
   } catch (msg) {
-  	printf("%c%d %d %s %d\n", 120, pid(), gettimeofday_ms(), msg, $fd);
+  	printf("%c%d %d %d %d %d %d %d\n", 120, pid(), gettimeofday_ms(), $fd, fr_ts, lr_ts, fw_ts, lw_ts);
   }
 }
 

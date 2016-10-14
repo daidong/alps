@@ -20,14 +20,15 @@
 #define EVENT_OPEN_RDONLY 101
 #define EVENT_OPEN_WRONLY 102
 #define EVENT_OPEN_RDWR 103
-#define EVENT_CLOSE 104
-#define EVENT_CLOSE_RDONLY 105
-#define EVENT_CLOSE_WRONLY 106
-#define EVENT_CLOSE_RDWR 107
-#define EVENT_READ_START 108
-#define EVENT_READ_END 109
-#define EVENT_WRITE_START 110
-#define EVENT_WRITE_END 111
+#define EVENT_CLOSE_OC 104
+#define EVENT_CLOSE_FL 105
+#define EVENT_CLOSE_RDONLY 106
+#define EVENT_CLOSE_WRONLY 107
+#define EVENT_CLOSE_RDWR 108
+#define EVENT_READ_START 109
+#define EVENT_READ_END 110
+#define EVENT_WRITE_START 111
+#define EVENT_WRITE_END 112
 
 #define EVENT_FIRST_READ 114
 #define EVENT_FIRST_WRITE 115
@@ -66,8 +67,8 @@ const static int TOLERABLE_DELAY = 1000; //maximal tolerable delay is 1000ms = 1
 
 struct file_access {
 	char file_name[STR_MAX_LEN];
-	long long ts;
-	int flag; //6 OPEN_RDONLY; 5 OPEN_WRONLY; 4 OPEN_RDWR; 3 FIRST_READ; 2 FIRST_WRITE; 1 LAST_READ; 0 LAST_WRITE
+	int fd, open_flag;
+	long long fr_ts, fw_ts, lr_ts, lw_ts;
 	struct file_access *next;
 };
 

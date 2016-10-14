@@ -28,11 +28,12 @@ static unsigned long long UNIQUE_FID(char *file, int rank) {
 	}
 }
 
+//			|| strstr(file, "/tmp/") == file
 static int filter_pipe_file(char *file) {
 	if (strstr(file, "pipe:") == file || strstr(file, "UNDEFINED") == file
 			|| strstr(file, "/dev/") == file
 			|| strstr(file, "anon_inode") == file
-			|| strstr(file, "socket:") == file || strstr(file, "/tmp/") == file
+			|| strstr(file, "socket:") == file
 			|| strstr(file, "/proc/") == file)
 		return 0;
 	else
@@ -46,45 +47,49 @@ static void builder_process_create_handler(alps_message recv) {
 	char parent_child[32] = "Parent To Child";
 	char child_parent[32] = "Child To Parent";
 
-	insert((char *) &unique_pid, sizeof(unsigned long long), (char *) &unique_child_pid,
-			sizeof(unsigned long long), EDGE_PARENT_CHILD, recv.ts1,
-			(char *) parent_child, strlen(parent_child));
+	insert((char *) &unique_pid, sizeof(unsigned long long),
+			(char *) &unique_child_pid, sizeof(unsigned long long),
+			EDGE_PARENT_CHILD, recv.ts1, (char *) parent_child,
+			strlen(parent_child));
 
-	insert((char *) &unique_child_pid, sizeof(unsigned long long), (char *) &unique_pid,
-			sizeof(unsigned long long), EDGE_CHILD_PARENT, recv.ts1,
-			(char *) child_parent, strlen(child_parent));
+	insert((char *) &unique_child_pid, sizeof(unsigned long long),
+			(char *) &unique_pid, sizeof(unsigned long long), EDGE_CHILD_PARENT,
+			recv.ts1, (char *) child_parent, strlen(child_parent));
 }
 
 static void builder_process_exit_handler(alps_message recv) {
 	unsigned long long unique_pid = recv.pid;
 
-	insert((char *) &unique_pid, sizeof(unsigned long long), (char *) &ATTR_EXEC_NAME,
-			sizeof(unsigned long long), EDGE_ATTR, recv.ts1, recv.execname,
-			strlen(recv.execname));
+	insert((char *) &unique_pid, sizeof(unsigned long long),
+			(char *) &ATTR_EXEC_NAME, sizeof(unsigned long long), EDGE_ATTR,
+			recv.ts1, recv.execname, strlen(recv.execname));
 
-	insert((char *) &unique_pid, sizeof(unsigned long long), (char *) &ATTR_ARG_STR,
-			sizeof(unsigned long long), EDGE_ATTR, recv.ts1, recv.argstr,
-			strlen(recv.argstr));
+	insert((char *) &unique_pid, sizeof(unsigned long long),
+			(char *) &ATTR_ARG_STR, sizeof(unsigned long long), EDGE_ATTR,
+			recv.ts1, recv.argstr, strlen(recv.argstr));
 
-	insert((char *) &unique_pid, sizeof(unsigned long long), (char *) &ATTR_ENV_STR,
-			sizeof(unsigned long long), EDGE_ATTR, recv.ts1, recv.env, strlen(recv.env));
+	insert((char *) &unique_pid, sizeof(unsigned long long),
+			(char *) &ATTR_ENV_STR, sizeof(unsigned long long), EDGE_ATTR,
+			recv.ts1, recv.env, strlen(recv.env));
 
-	insert((char *) &unique_pid, sizeof(unsigned long long), (char *) &ATTR_RET_STR,
-			sizeof(unsigned long long), EDGE_ATTR, recv.ts1, recv.retstr,
-			strlen(recv.retstr));
+	insert((char *) &unique_pid, sizeof(unsigned long long),
+			(char *) &ATTR_RET_STR, sizeof(unsigned long long), EDGE_ATTR,
+			recv.ts1, recv.retstr, strlen(recv.retstr));
 
-	insert((char *) &unique_pid, sizeof(unsigned long long), (char *) &ATTR_EXEC_FILE,
-			sizeof(unsigned long long), EDGE_ATTR, recv.ts1, recv.execfile,
-			strlen(recv.execfile));
+	insert((char *) &unique_pid, sizeof(unsigned long long),
+			(char *) &ATTR_EXEC_FILE, sizeof(unsigned long long), EDGE_ATTR,
+			recv.ts1, recv.execfile, strlen(recv.execfile));
 
 	char sts1[32], sts2[32];
 	sprintf(sts1, "%lld", recv.ts1);
 	sprintf(sts2, "%lld", recv.ts2);
 
-	insert((char *) &unique_pid, sizeof(unsigned long long), (char *) &ATTR_START_TS,
-			sizeof(unsigned long long), EDGE_ATTR, recv.ts1, sts1, strlen(sts1));
-	insert((char *) &unique_pid, sizeof(unsigned long long), (char *) &ATTR_END_TS,
-			sizeof(unsigned long long), EDGE_ATTR, recv.ts1, sts2, strlen(sts2));
+	insert((char *) &unique_pid, sizeof(unsigned long long),
+			(char *) &ATTR_START_TS, sizeof(unsigned long long), EDGE_ATTR,
+			recv.ts1, sts1, strlen(sts1));
+	insert((char *) &unique_pid, sizeof(unsigned long long),
+			(char *) &ATTR_END_TS, sizeof(unsigned long long), EDGE_ATTR,
+			recv.ts1, sts2, strlen(sts2));
 }
 
 static void builder_file_event_handler(int event, alps_message recv, int rank,
@@ -117,9 +122,11 @@ static void builder_file_event_handler(int event, alps_message recv, int rank,
 
 	struct alps_version *internal_pre_ptr = ptr;
 	struct alps_version *internal_ptr = ptr->version_next;
+
 #ifdef DEBUG_BUILDER_LEVEL_1
 	printf("[4.5] [BUILDER] File Event: %d\n", event);
 #endif
+
 	if (event == EVENT_FIRST_WRITE || event == EVENT_OPEN_RDWR
 			|| event == EVENT_OPEN_WRONLY) {
 		while (internal_ptr != NULL) {
@@ -149,12 +156,12 @@ static void builder_file_event_handler(int event, alps_message recv, int rank,
 		/*
 		 * this is a write edge between PID to the file, with correct version.
 		 */
-		insert((char *) &unique_pid, sizeof(unsigned long long), (char *) &unique_fid,
-				sizeof(unsigned long long), EDGE_WRITE,
+		insert((char *) &unique_pid, sizeof(unsigned long long),
+				(char *) &unique_fid, sizeof(unsigned long long), EDGE_WRITE,
 				(long long) internal_ptr->version, recv.execfile,
 				strlen(recv.execfile));
-		insert((char *) &unique_fid, sizeof(unsigned long long), (char *) &unique_pid,
-				sizeof(unsigned long long), EDGE_WRITE_BY,
+		insert((char *) &unique_fid, sizeof(unsigned long long),
+				(char *) &unique_pid, sizeof(unsigned long long), EDGE_WRITE_BY,
 				(long long) internal_ptr->version, recv.execfile,
 				strlen(recv.execfile));
 	}
@@ -173,12 +180,12 @@ static void builder_file_event_handler(int event, alps_message recv, int rank,
 		/*
 		 * this is a read edge between PID to the file.
 		 */
-		insert((char *) &unique_pid, sizeof(unsigned long long), (char *) &unique_fid,
-				sizeof(unsigned long long), EDGE_READ,
+		insert((char *) &unique_pid, sizeof(unsigned long long),
+				(char *) &unique_fid, sizeof(unsigned long long), EDGE_READ,
 				(long long) internal_pre_ptr->version, recv.execfile,
 				strlen(recv.execfile));
-		insert((char *) &unique_fid, sizeof(unsigned long long), (char *) &unique_pid,
-				sizeof(unsigned long long), EDGE_READ_BY,
+		insert((char *) &unique_fid, sizeof(unsigned long long),
+				(char *) &unique_pid, sizeof(unsigned long long), EDGE_READ_BY,
 				(long long) internal_pre_ptr->version, recv.execfile,
 				strlen(recv.execfile));
 
@@ -321,8 +328,6 @@ int main(int argc, char **argv) {
 		for (int i = 0; i < BUCKET_NUM; i++)
 			memset(&all_alive_execs[i], 0, sizeof(struct alps_exec));
 
-		int gran = 0;
-
 		while ((read = getline(&line, &len, pipe_fd)) != -1) {
 			bytes_read += len;
 			char *p = (line + 1);
@@ -334,6 +339,7 @@ int main(int argc, char **argv) {
 			struct file_access *f_pre_ptr, *f_ptr;
 			alps_message msg;
 			memset(&msg, 0, sizeof(alps_message));
+			long long fr_ts = 0, lr_ts = 0, fw_ts = 0, lw_ts = 0;
 
 			//printf("AGGREGATOR GETS LINE: %s Start\n", line);
 
@@ -421,6 +427,7 @@ int main(int argc, char **argv) {
 
 				//remove ptr from the list
 				pre_ptr->next = ptr->next;
+				//@TODO: before freeing ptr, we should free all its accessed files first.
 				free(ptr);
 
 				break;
@@ -505,70 +512,56 @@ int main(int argc, char **argv) {
 				target_builder = hash_str(filename,
 						total_size - ALPS_DIVIDE) + ALPS_DIVIDE;
 
-				if (gran == 0) {
-					if ((flag & 0x3) == 0) {
-						msg.message_header = EVENT_OPEN_RDONLY;
-					} else if ((flag & 0x3) == 1) {
-						msg.message_header = EVENT_OPEN_WRONLY;
-					} else {
-						msg.message_header = EVENT_OPEN_RDWR;
+				if ((flag & 0x3) == 0) {
+					msg.message_header = EVENT_OPEN_RDONLY;
+				} else if ((flag & 0x3) == 1) {
+					msg.message_header = EVENT_OPEN_WRONLY;
+				} else {
+					msg.message_header = EVENT_OPEN_RDWR;
+				}
+
+				//check the first read.
+				//unique_fid = UNIQUE_FID(filename, rank);
+				bucket = (unsigned long) fd % BUCKET_NUM;
+				f_pre_ptr = &ptr->all_opened_files[bucket];
+				f_ptr = f_pre_ptr->next;
+				int exception = 0;
+
+				while (f_ptr != NULL) {
+					if (strcmp(f_ptr->file_name, filename) == 0) {
+						exception = 1;
+						printf(
+								"[UNEXPECTED ERROR] Open an opened file again\n");
 					}
+					f_pre_ptr = f_ptr;
+					f_ptr = f_ptr->next;
+				}
 
-#ifdef DEBUG_AGG_LEVEL_2
-					printf("[2] Open - PID: %d, timestamp: %lld, filename: %s, EVENT:%d\n",
-							pid, timestamp, filename, msg.message_header);
-#endif
+				if (exception == 0) { //create open file entity if no exception happens
+					f_ptr = (struct file_access *) malloc(
+							sizeof(struct file_access));
+					if (msg.message_header == EVENT_OPEN_RDONLY)
+						f_ptr->open_flag = ACCESS_BIT_OPEN_RDONLY;
+					if (msg.message_header == EVENT_OPEN_WRONLY)
+						f_ptr->open_flag = ACCESS_BIT_OPEN_WRONLY;
+					if (msg.message_header == EVENT_OPEN_RDWR)
+						f_ptr->open_flag = ACCESS_BIT_OPEN_RDWR;
 
-					//check the first read.
-					unique_fid = UNIQUE_FID(filename, rank);
-					bucket = (unsigned long) unique_fid % BUCKET_NUM;
+					strcpy(f_ptr->file_name, filename);
+					f_ptr->next = NULL;
+					f_pre_ptr->next = f_ptr;
 
-					f_pre_ptr = &ptr->all_opened_files[bucket];
-					f_ptr = f_pre_ptr->next;
-					int exception = 0;
-
-					while (f_ptr != NULL) {
-						if (strcmp(f_ptr->file_name, filename) == 0) {
-							exception = 1;
-							//printf("[UNEXPECTED ERROR] Open an opened file again\n");
-						}
-						f_pre_ptr = f_ptr;
-						f_ptr = f_ptr->next;
-					}
-
-					if (exception == 0) { //create open file entity if no exception happens
-						f_ptr = (struct file_access *) malloc(
-								sizeof(struct file_access));
-						if (msg.message_header == EVENT_OPEN_RDONLY)
-							f_ptr->flag = ACCESS_BIT_OPEN_RDONLY;
-						if (msg.message_header == EVENT_OPEN_WRONLY)
-							f_ptr->flag = ACCESS_BIT_OPEN_WRONLY;
-						if (msg.message_header == EVENT_OPEN_RDWR)
-							f_ptr->flag = ACCESS_BIT_OPEN_RDWR;
-
-						f_ptr->ts = timestamp;
-						strcpy(f_ptr->file_name, filename);
-						f_ptr->next = NULL;
-						f_pre_ptr->next = f_ptr;
-
-						msg.pid = unique_pid;
-						msg.ts1 = timestamp;
-						strcpy(msg.execfile, filename);
-						MPI_Send(&msg, 1, alps_message_type, target_builder, 0,
-						MPI_COMM_WORLD);
-					}
+					msg.pid = unique_pid;
+					msg.ts1 = timestamp;
+					strcpy(msg.execfile, filename);
+					MPI_Send(&msg, 1, alps_message_type, target_builder, 0,
+					MPI_COMM_WORLD);
 				}
 
 				break;
 
-			case EVENT_CLOSE:
-				sscanf(p, "%d %lld %s %d\n", &pid, &timestamp, filename, &fd);
-#ifdef DEBUG_AGG_LEVEL_1
-				printf("[1] Close - PID: %d, timestamp: %lld, filename: %s, fd: %d\n", pid, timestamp, filename, fd);
-#endif
-				if (filter_pipe_file(filename) == 0)
-					break;
-
+			case EVENT_CLOSE_OC:
+				sscanf(p, "%d %lld %d\n", &pid, &timestamp, &fd);
 				bucket = pid % BUCKET_NUM;
 				ptr = all_alive_execs[bucket].next;
 				while (ptr != NULL) {
@@ -580,77 +573,51 @@ int main(int argc, char **argv) {
 				if (ptr == NULL)
 					break;
 
-#ifdef DEBUG_AGG_LEVEL_2
-				printf("[2] An existing - PID: %d close %s at %lld\n", pid, filename, timestamp);
-#endif
 				unique_pid = ptr->unique_id;
-				target_builder = hash_str(filename,
-						total_size - ALPS_DIVIDE) + ALPS_DIVIDE;
 
-				unique_fid = UNIQUE_FID(filename, rank);
-				bucket = (unsigned long) unique_fid % BUCKET_NUM;
+				bucket = (unsigned long) fd % BUCKET_NUM;
 				f_pre_ptr = &ptr->all_opened_files[bucket];
 				f_ptr = f_pre_ptr->next;
 
-#ifdef DEBUG_AGG_LEVEL_2
-				printf("[2.5] An existing - PID: %d close %s at %lld\n", pid, filename, timestamp);
-#endif
 				while (f_ptr != NULL) {
-					if (strcmp(f_ptr->file_name, filename) == 0) {
+					if (f_ptr->fd == fd) {
+						target_builder = hash_str(f_ptr->file_name,
+								total_size - ALPS_DIVIDE) + ALPS_DIVIDE;
 
-						if (f_ptr->flag == ACCESS_BIT_LAST_WRITE) {
-							msg.message_header = EVENT_LAST_WRITE;
-							msg.ts1 = f_ptr->ts;
-						}
-						if (f_ptr->flag == ACCESS_BIT_LAST_READ) {
-							msg.message_header = EVENT_LAST_READ;
-							msg.ts1 = f_ptr->ts;
-						}
-						if (f_ptr->flag == ACCESS_BIT_OPEN_RDWR) {
+						msg.pid = unique_pid;
+						strcpy(msg.execfile, filename);
+
+						if (f_ptr->open_flag == ACCESS_BIT_OPEN_RDWR) {
 							msg.message_header = EVENT_CLOSE_RDWR;
 							msg.ts1 = timestamp;
 						}
-						if (f_ptr->flag == ACCESS_BIT_OPEN_WRONLY) {
+						if (f_ptr->open_flag == ACCESS_BIT_OPEN_WRONLY) {
 							msg.message_header = EVENT_CLOSE_WRONLY;
 							msg.ts1 = timestamp;
 						}
-						if (f_ptr->flag == ACCESS_BIT_OPEN_RDONLY) {
+						if (f_ptr->open_flag == ACCESS_BIT_OPEN_RDONLY) {
 							msg.message_header = EVENT_CLOSE_RDONLY;
 							msg.ts1 = timestamp;
 						}
 
-						// Only send message with these headers
-						if (msg.message_header != 0) {
-							msg.pid = unique_pid;
-							strcpy(msg.execfile, filename);
-							MPI_Send(&msg, 1, alps_message_type, target_builder,
-									0,
-									MPI_COMM_WORLD);
-						}
+						MPI_Send(&msg, 1, alps_message_type, target_builder, 0,
+						MPI_COMM_WORLD);
 
 						//delete it
 						struct file_access *f_free = f_ptr;
 						f_pre_ptr->next = f_ptr->next;
 						f_ptr = f_ptr->next;
 						free(f_free);
-					}			
+					}
 					f_pre_ptr = f_ptr;
 					if (f_ptr != NULL)
 						f_ptr = f_ptr->next;
 				}
 				break;
 
-			case EVENT_READ_START:
-				if (gran == 0)
-					break;
-
-				sscanf(p, "%d %lld %s\n", &pid, &timestamp, filename);
-#ifdef DEBUG_AGG_LEVEL_1
-				printf("[1] Read Start - PID: %d, timestamp: %lld, filename: %s\n", pid, timestamp, filename);
-#endif
-
-				if (filter_pipe_file(filename) == 0)
-					break;
+			case EVENT_CLOSE_FL:
+				sscanf(p, "%d %lld %d %lld %lld %lld %lld\n", &pid, &timestamp,
+						&fd, &fr_ts, &lr_ts, &fw_ts, &lw_ts);
 
 				bucket = pid % BUCKET_NUM;
 				ptr = all_alive_execs[bucket].next;
@@ -665,218 +632,75 @@ int main(int argc, char **argv) {
 
 				unique_pid = ptr->unique_id;
 
-				target_builder = hash_str(filename,
-						total_size - ALPS_DIVIDE) + ALPS_DIVIDE;
-
-				//check the first read.
-				unique_fid = UNIQUE_FID(filename, rank);
-				bucket = (unsigned long) unique_fid % BUCKET_NUM;
+				bucket = (unsigned long) fd % BUCKET_NUM;
 				f_pre_ptr = &ptr->all_opened_files[bucket];
 				f_ptr = f_pre_ptr->next;
+
 				while (f_ptr != NULL) {
-					if (strcmp(f_ptr->file_name, filename) == 0) {
-						if (f_ptr->flag == ACCESS_BIT_FIRST_READ) {
-							break;
+					if (f_ptr->fd == fd) {
+						target_builder = hash_str(f_ptr->file_name,
+								total_size - ALPS_DIVIDE) + ALPS_DIVIDE;
+
+						msg.pid = unique_pid;
+						strcpy(msg.execfile, filename);
+
+						if (fr_ts != 0) { //send out first read
+							msg.ts1 = fr_ts;
+							msg.message_header = EVENT_FIRST_READ;
+							MPI_Send(&msg, 1, alps_message_type, target_builder,
+									0,
+									MPI_COMM_WORLD);
 						}
+						if (lr_ts != 0) { //send out last read
+							msg.ts1 = lr_ts;
+							msg.message_header = EVENT_LAST_READ;
+							MPI_Send(&msg, 1, alps_message_type, target_builder,
+									0,
+									MPI_COMM_WORLD);
+						}
+						if (fw_ts != 0) { //send out first write
+							msg.ts1 = fw_ts;
+							msg.message_header = EVENT_FIRST_READ;
+							MPI_Send(&msg, 1, alps_message_type, target_builder,
+									0,
+									MPI_COMM_WORLD);
+						}
+						if (lw_ts != 0) { //send out last write
+							msg.ts1 = lw_ts;
+							msg.message_header = EVENT_LAST_READ;
+							MPI_Send(&msg, 1, alps_message_type, target_builder,
+									0,
+									MPI_COMM_WORLD);
+						}
+
+						if (f_ptr->open_flag == ACCESS_BIT_OPEN_RDWR) {
+							msg.message_header = EVENT_CLOSE_RDWR;
+							msg.ts1 = timestamp;
+						}
+						if (f_ptr->open_flag == ACCESS_BIT_OPEN_WRONLY) {
+							msg.message_header = EVENT_CLOSE_WRONLY;
+							msg.ts1 = timestamp;
+						}
+						if (f_ptr->open_flag == ACCESS_BIT_OPEN_RDONLY) {
+							msg.message_header = EVENT_CLOSE_RDONLY;
+							msg.ts1 = timestamp;
+						}
+
+						MPI_Send(&msg, 1, alps_message_type, target_builder, 0,
+						MPI_COMM_WORLD);
+
+						//delete it
+						struct file_access *f_free = f_ptr;
+						f_pre_ptr->next = f_ptr->next;
+						f_ptr = f_ptr->next;
+						free(f_free);
 					}
 					f_pre_ptr = f_ptr;
-					f_ptr = f_ptr->next;
-				}
-
-				if (f_ptr == NULL) {
-					//if no first read on this file yet, create one and send message instantly
-					f_ptr = (struct file_access *) malloc(
-							sizeof(struct file_access));
-					f_ptr->flag = ACCESS_BIT_FIRST_READ;
-					f_ptr->ts = timestamp;
-					strcpy(f_ptr->file_name, filename);
-					f_ptr->next = NULL;
-					f_pre_ptr->next = f_ptr;
-
-					msg.pid = unique_pid;
-					msg.ts1 = timestamp;
-					strcpy(msg.execfile, filename);
-					msg.message_header = EVENT_FIRST_READ;
-					MPI_Send(&msg, 1, alps_message_type, target_builder, 0,
-					MPI_COMM_WORLD);
-				}
-
-				break;
-
-			case EVENT_READ_END:
-				if (gran == 0)
-					break;
-
-				sscanf(p, "%d %lld %s\n", &pid, &timestamp, filename);
-#ifdef DEBUG_AGG_LEVEL_1
-				printf("[1] Read End - PID: %d, timestamp: %lld, filename: %s\n", pid, timestamp, filename);
-#endif
-
-				if (filter_pipe_file(filename) == 0)
-					break;
-
-				bucket = pid % BUCKET_NUM;
-				ptr = all_alive_execs[bucket].next;
-				while (ptr != NULL) {
-					if (ptr->pid == pid)
-						break;
-					ptr = ptr->next;
-				}
-				// if never capture this process, should ignore its I/Os
-				if (ptr == NULL)
-					break;
-
-				// check and update the last read
-				unique_fid = UNIQUE_FID(filename, rank);
-				bucket = (unsigned long) unique_fid % BUCKET_NUM;
-				f_pre_ptr = &ptr->all_opened_files[bucket];
-				f_ptr = f_pre_ptr->next;
-				while (f_ptr != NULL) {
-					if (strcmp(f_ptr->file_name, filename) == 0) {
-						if (f_ptr->flag == ACCESS_BIT_LAST_READ) {
-							break;
-						}
-					}
-					f_pre_ptr = f_ptr;
-					f_ptr = f_ptr->next;
-				}
-
-				if (f_ptr == NULL) {
-					//if no first read on this file yet, create one and send message instantly
-					f_ptr = (struct file_access *) malloc(
-							sizeof(struct file_access));
-					f_ptr->flag = ACCESS_BIT_LAST_READ;
-					f_ptr->ts = timestamp;
-					strcpy(f_ptr->file_name, filename);
-					f_ptr->next = NULL;
-					f_pre_ptr->next = f_ptr;
-				} else {
-					f_ptr->ts = timestamp;
-				}
-
-				break;
-
-			case EVENT_WRITE_START:
-				if (gran == 0)
-					break;
-
-				sscanf(p, "%d %lld %s\n", &pid, &timestamp, filename);
-#ifdef DEBUG_AGG_LEVEL_1
-				printf("[1] Write - PID: %d, timestamp: %lld, filename: %s\n", pid, timestamp, filename);
-#endif
-
-				if (filter_pipe_file(filename) == 0)
-					break;
-
-				bucket = pid % BUCKET_NUM;
-				ptr = all_alive_execs[bucket].next;
-				while (ptr != NULL) {
-					if (ptr->pid == pid)
-						break;
-					ptr = ptr->next;
-				}
-				// if never capture this process, should ignore its I/Os
-				if (ptr == NULL)
-					break;
-
-#ifdef DEBUG_AGG_LEVEL_2
-				printf("[2] An existing - PID: %d write %s at %lld\n", pid, filename, timestamp);
-#endif
-
-				unique_pid = ptr->unique_id;
-				target_builder = hash_str(filename,
-						total_size - ALPS_DIVIDE) + ALPS_DIVIDE;
-
-				// do not need to maintain the last write as this is not accurate.
-				//check the first write.
-				unique_fid = UNIQUE_FID(filename, rank);
-				bucket = (unsigned long) unique_fid % BUCKET_NUM;
-				f_pre_ptr = &ptr->all_opened_files[bucket];
-				f_ptr = f_pre_ptr->next;
-				while (f_ptr != NULL) {
-					if (strcmp(f_ptr->file_name, filename) == 0) {
-						if (f_ptr->flag == ACCESS_BIT_FIRST_WRITE) {
-							break;
-						}
-					}
-					f_pre_ptr = f_ptr;
-					f_ptr = f_ptr->next;
-				}
-
-				if (f_ptr == NULL) {
-					//if no first read on this file yet, create one and send message instantly
-					f_ptr = (struct file_access *) malloc(
-							sizeof(struct file_access));
-					f_ptr->flag = ACCESS_BIT_FIRST_WRITE;
-					f_ptr->ts = timestamp;
-					strcpy(f_ptr->file_name, filename);
-					f_ptr->next = NULL;
-					f_pre_ptr->next = f_ptr;
-
-					msg.pid = unique_pid;
-					msg.ts1 = timestamp;
-					strcpy(msg.execfile, filename);
-					msg.message_header = ACCESS_BIT_FIRST_WRITE;
-					MPI_Send(&msg, 1, alps_message_type, target_builder, 0,
-					MPI_COMM_WORLD);
+					if (f_ptr != NULL)
+						f_ptr = f_ptr->next;
 				}
 				break;
 
-			case EVENT_WRITE_END:
-				if (gran == 0)
-					break;
-
-				sscanf(p, "%d %lld %s\n", &pid, &timestamp, filename);
-#ifdef DEBUG_AGG_LEVEL_1
-				printf("[1] Write - PID: %d, timestamp: %lld, filename: %s\n", pid, timestamp, filename);
-#endif
-
-				if (filter_pipe_file(filename) == 0)
-					break;
-
-				bucket = pid % BUCKET_NUM;
-				ptr = all_alive_execs[bucket].next;
-				while (ptr != NULL) {
-					if (ptr->pid == pid)
-						break;
-					ptr = ptr->next;
-				}
-				// if never capture this process, should ignore its I/Os
-				if (ptr == NULL)
-					break;
-
-#ifdef DEBUG_AGG_LEVEL_2
-				printf("[2] An existing - PID: %d write %s at %lld\n", pid, filename, timestamp);
-#endif
-
-				// check and update the last write
-				unique_fid = UNIQUE_FID(filename, rank);
-				bucket = (unsigned long) unique_fid % BUCKET_NUM;
-				f_pre_ptr = &ptr->all_opened_files[bucket];
-				f_ptr = f_pre_ptr->next;
-				while (f_ptr != NULL) {
-					if (strcmp(f_ptr->file_name, filename) == 0) {
-						if (f_ptr->flag == ACCESS_BIT_LAST_WRITE) {
-							break;
-						}
-					}
-					f_pre_ptr = f_ptr;
-					f_ptr = f_ptr->next;
-				}
-
-				if (f_ptr == NULL) {
-					//if no first read on this file yet, create one and send message instantly
-					f_ptr = (struct file_access *) malloc(
-							sizeof(struct file_access));
-					f_ptr->flag = ACCESS_BIT_LAST_WRITE;
-					f_ptr->ts = timestamp;
-					strcpy(f_ptr->file_name, filename);
-					f_ptr->next = NULL;
-					f_pre_ptr->next = f_ptr;
-				} else {
-					f_ptr->ts = timestamp;
-				}
-				break;
 			}
 			//printf("AGGREGATOR GETS LINE: %s END\n", line);
 		}

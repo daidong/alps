@@ -25,3 +25,7 @@ unsigned long hash_long(long long pid, int total) {
 	return pid % total;
 }
 
+unsigned long hash_int(int fd, int total){
+	return fd % total;
+}
+
