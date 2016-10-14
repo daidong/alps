@@ -152,7 +152,7 @@ probe kernel.function("sys_close")
 	printf("%c%d %d %d %d %d %d %d\n", 105, pid(), gettimeofday_ms(), $fd, fr_ts, lr_ts, fw_ts, lw_ts);
     	
   } catch (msg) {
-  	printf("%c%d %d %d %d %d %d %d\n", 120, pid(), gettimeofday_ms(), $fd, fr_ts, lr_ts, fw_ts, lw_ts);
+  	printf("%c%d %d %d %d %d %d %d %s\n", 120, pid(), gettimeofday_ms(), $fd, fr_ts, lr_ts, fw_ts, lw_ts, msg);
   }
 }
 

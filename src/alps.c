@@ -531,7 +531,8 @@ int main(int argc, char **argv) {
 					if (strcmp(f_ptr->file_name, filename) == 0) {
 						exception = 1;
 						printf(
-								"[UNEXPECTED ERROR] Open an opened file again\n");
+								"[UNEXPECTED ERROR] Process %d open an opened file fd [%d] %s again\n",
+								pid, fd, filename);
 					}
 					f_pre_ptr = f_ptr;
 					f_ptr = f_ptr->next;
@@ -548,6 +549,7 @@ int main(int argc, char **argv) {
 						f_ptr->open_flag = ACCESS_BIT_OPEN_RDWR;
 
 					strcpy(f_ptr->file_name, filename);
+					f_ptr->fd = fd;
 					f_ptr->next = NULL;
 					f_pre_ptr->next = f_ptr;
 
@@ -651,16 +653,17 @@ int main(int argc, char **argv) {
 									0,
 									MPI_COMM_WORLD);
 						}
-						if (lr_ts != 0) { //send out last read
-							msg.ts1 = lr_ts;
-							msg.message_header = EVENT_LAST_READ;
+						if (fw_ts != 0) { //send out first write
+							msg.ts1 = fw_ts;
+							msg.message_header = EVENT_FIRST_READ;
 							MPI_Send(&msg, 1, alps_message_type, target_builder,
 									0,
 									MPI_COMM_WORLD);
 						}
-						if (fw_ts != 0) { //send out first write
-							msg.ts1 = fw_ts;
-							msg.message_header = EVENT_FIRST_READ;
+
+						if (lr_ts != 0) { //send out last read
+							msg.ts1 = lr_ts;
+							msg.message_header = EVENT_LAST_READ;
 							MPI_Send(&msg, 1, alps_message_type, target_builder,
 									0,
 									MPI_COMM_WORLD);
