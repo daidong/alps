@@ -7,7 +7,6 @@ struct node{
 	int group;
 	unsigned long long uniqueId;
 	long long version;
-	int print_id;
 	char name[MAX_STR];
 	struct node *next;
 };

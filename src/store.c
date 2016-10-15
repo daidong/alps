@@ -205,8 +205,7 @@ void iterate_json() {
 
 	struct node header;
 	memset(&header, 0, sizeof(struct node));
-	struct node *pre_ptr = &header;
-	struct node *ptr = header.next;
+	struct node *pre_ptr, *ptr;
 
 	int node_num = 0;
 	int link_num = 0;
@@ -215,12 +214,17 @@ void iterate_json() {
 	while ((ret = dbcp->c_get(dbcp, &key, &data, DB_NEXT)) == 0) {
 		DBKey *dbkey = build(&key);
 
-		unsigned long long src = (*(unsigned long long *) dbkey->src.data)
-				& 0xFFFF;
-		unsigned long long dst = (*(unsigned long long *) dbkey->dst.data)
-				& 0xFFFF;
+		unsigned long long src, short_src, dst, short_dst;
+
+		src = (*(unsigned long long *) dbkey->src.data);
+		short_src = src & 0xFFFF;
+		dst = (*(unsigned long long *) dbkey->dst.data);
+		short_dst = dst & 0xFFFF;
+
 		long long ts = (long long) dbkey->ts;
+
 		int type = dbkey->type;
+
 		int length = data.size;
 		char *str = (char *) malloc(sizeof(char) * length + 1);
 		memcpy(str, data.data, length);
@@ -234,35 +238,34 @@ void iterate_json() {
 
 		if (type == EDGE_PARENT_CHILD || type == EDGE_CHILD_PARENT) {
 			int src_exist = 0, dst_exist = 0;
+
 			pre_ptr = &header;
 			ptr = header.next;
 
 			while (ptr != NULL) {
-				if (ptr->uniqueId == src)
+				if (ptr->uniqueId == (src + ts))
 					src_exist = 1;
-				if (ptr->uniqueId == dst)
+				if (ptr->uniqueId == (dst + ts))
 					dst_exist = 1;
 				pre_ptr = ptr;
 				ptr = ptr->next;
 			}
 			if (src_exist == 0) {
 				ptr = (struct node *) malloc(sizeof(struct node));
-				node_num += 1;
-				ptr->uniqueId = src;
+				ptr->version = ts;
+				ptr->uniqueId = src + ptr->version;
 				ptr->next = NULL;
 				ptr->group = GROUP_PROCESS; //process
-				ptr->print_id = 0;
-				sprintf(ptr->name, "%llu ", src);
+				sprintf(ptr->name, "%llu ", short_src);
 				pre_ptr->next = ptr;
 			}
 			if (dst_exist == 0) {
 				ptr = (struct node *) malloc(sizeof(struct node));
-				node_num += 1;
-				ptr->uniqueId = dst;
+				ptr->version = ts;
+				ptr->uniqueId = dst + ptr->version;
 				ptr->next = NULL;
 				ptr->group = GROUP_PROCESS; //process
-				ptr->print_id = 0;
-				sprintf(ptr->name, "%llu ", dst);
+				sprintf(ptr->name, "%llu ", short_dst);
 				pre_ptr->next = ptr;
 			}
 		}
@@ -271,12 +274,12 @@ void iterate_json() {
 			ptr = header.next;
 
 			while (ptr != NULL) {
-				if (ptr->uniqueId == src) {
-					if (dst == ATTR_EXEC_NAME)
+				if (ptr->uniqueId == (src + ts)) {
+					if (short_dst == ATTR_EXEC_NAME)
 						strcat(ptr->name, str);
-					if (dst == ATTR_ARG_STR)
+					if (short_dst == ATTR_ARG_STR)
 						strcat(ptr->name, str);
-					if (dst == ATTR_EXEC_FILE) {
+					if (short_dst == ATTR_EXEC_FILE) {
 						strcat(ptr->name, str);
 					}
 					break;
@@ -286,12 +289,11 @@ void iterate_json() {
 			}
 			if (ptr == NULL) {
 				ptr = (struct node *) malloc(sizeof(struct node));
-				node_num += 1;
-				ptr->uniqueId = src;
+				ptr->version = ts;
+				ptr->uniqueId = src + ptr->version;
 				ptr->next = NULL;
 				ptr->group = GROUP_PROCESS; //process
-				sprintf(ptr->name, "%llu ", src);
-				ptr->print_id = 0;
+				sprintf(ptr->name, "%llu ", short_src);
 				pre_ptr->next = ptr;
 			}
 		}
@@ -301,7 +303,7 @@ void iterate_json() {
 			ptr = header.next;
 
 			while (ptr != NULL) {
-				if (ptr->uniqueId == src && ptr->version == ts) {
+				if (ptr->uniqueId == (src + ts) && ptr->version == ts) {
 					strcpy(ptr->name, str);
 					char ver[32] = { 0 };
 					sprintf(ver, " VERSION: %lld", ts);
@@ -313,12 +315,10 @@ void iterate_json() {
 			}
 			if (ptr == NULL) {
 				ptr = (struct node *) malloc(sizeof(struct node));
-				node_num += 1;
-				ptr->uniqueId = src;
+				ptr->version = ts;
+				ptr->uniqueId = src + ptr->version;
 				ptr->next = NULL;
 				ptr->group = GROUP_FILE; //process
-				ptr->print_id = 0;
-				ptr->version = ts;
 				strcpy(ptr->name, str);
 				char ver[32] = { 0 };
 				sprintf(ver, " VERSION: %lld", ts);
@@ -334,13 +334,21 @@ void iterate_json() {
 
 	pre_ptr = &header;
 	ptr = header.next;
-	printf("{\"nodes\":[");
+	while (ptr != NULL){
+		node_num += 1;
+		ptr = ptr->next;
+	}
+
+	pre_ptr = &header;
+	ptr = header.next;
+	printf("{\"nodes\":[\n");
 	int p_idx = 0;
 	while (ptr != NULL) {
-		printf("{\"group\":%d, \"name\":\"%s\"}", ptr->group, ptr->name);
+		printf("\t{\"id\":\"%llu\", \"group\":%d, \"name\":\"%s\"}", ptr->uniqueId, ptr->group, ptr->name);
 		if (p_idx != (node_num - 1))
 			printf(",");
-		ptr->print_id = p_idx++;
+		printf("\n");
+		p_idx ++;
 		ptr = ptr->next;
 	}
 	printf("],");
@@ -356,17 +364,15 @@ void iterate_json() {
 		return;
 	}
 
-	printf("\"links\":[");
+	printf("\"links\":[\n");
 
 	int l_idx = 0;
 	/* Walk through the database and print out the links */
 	while ((ret = dbcp->c_get(dbcp, &key, &data, DB_NEXT)) == 0) {
 		DBKey *dbkey = build(&key);
 
-		unsigned long long src = (*(unsigned long long *) dbkey->src.data)
-				& 0xFFFF;
-		unsigned long long dst = (*(unsigned long long *) dbkey->dst.data)
-				& 0xFFFF;
+		unsigned long long src = (*(unsigned long long *) dbkey->src.data);
+		unsigned long long dst = (*(unsigned long long *) dbkey->dst.data);
 		long long ts = (long long) dbkey->ts;
 		int type = dbkey->type;
 
@@ -374,29 +380,15 @@ void iterate_json() {
 		struct node *ptr = header.next;
 
 		if (type != EDGE_ATTR) {
-			int src_pnt_id, dst_pnt_id;
+			if (type == EDGE_READ_BY || type == EDGE_WRITE_BY)
+				src += ts;
+			if (type == EDGE_WRITE || type == EDGE_READ)
+				dst += ts;
 
-			while (ptr != NULL) {
-				if (type == EDGE_WRITE || type == EDGE_READ
-						|| type == EDGE_WRITE_BY || type == EDGE_READ_BY) {
-					if (ptr->uniqueId == src && ptr->version == ts)
-						src_pnt_id = ptr->print_id;
-					if (ptr->uniqueId == dst && ptr->version == ts)
-						dst_pnt_id = ptr->print_id;
-				} else {
-					if (ptr->uniqueId == src)
-						src_pnt_id = ptr->print_id;
-					if (ptr->uniqueId == dst)
-						dst_pnt_id = ptr->print_id;
-				}
-				ptr = ptr->next;
-			}
-
-			printf("{\"source\":%d,\"target\":%d,\"value\":%lld}", src_pnt_id,
-					dst_pnt_id, ts);
+			printf("\t{\"source\":\"%llu\",\"target\":\"%llu\",\"value\":%lld}", src, dst, ts);
 			if (l_idx != (link_num - 1))
 				printf(",");
-
+			printf("\n");
 			l_idx += 1;
 		}
 	}
