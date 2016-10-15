@@ -44,17 +44,18 @@ static void builder_process_create_handler(alps_message recv) {
 	unsigned long long unique_pid = recv.pid;
 	unsigned long long unique_child_pid = recv.child_pid;
 
-	char parent_child[32] = "Parent To Child";
-	char child_parent[32] = "Child To Parent";
+	char parent_child[32], child_parent[32];
+	sprintf(parent_child, "Parent To Child: %lld", recv.ts1);
+	sprintf(child_parent, "Child To Parent: %lld", recv.ts1);
 
 	insert((char *) &unique_pid, sizeof(unsigned long long),
 			(char *) &unique_child_pid, sizeof(unsigned long long),
-			EDGE_PARENT_CHILD, recv.ts1, (char *) parent_child,
+			EDGE_PARENT_CHILD, 0, (char *) parent_child,
 			strlen(parent_child));
 
 	insert((char *) &unique_child_pid, sizeof(unsigned long long),
 			(char *) &unique_pid, sizeof(unsigned long long), EDGE_CHILD_PARENT,
-			recv.ts1, (char *) child_parent, strlen(child_parent));
+			0, (char *) child_parent, strlen(child_parent));
 }
 
 static void builder_process_exit_handler(alps_message recv) {
@@ -62,23 +63,23 @@ static void builder_process_exit_handler(alps_message recv) {
 
 	insert((char *) &unique_pid, sizeof(unsigned long long),
 			(char *) &ATTR_EXEC_NAME, sizeof(unsigned long long), EDGE_ATTR,
-			recv.ts1, recv.execname, strlen(recv.execname));
+			0, recv.execname, strlen(recv.execname));
 
 	insert((char *) &unique_pid, sizeof(unsigned long long),
 			(char *) &ATTR_ARG_STR, sizeof(unsigned long long), EDGE_ATTR,
-			recv.ts1, recv.argstr, strlen(recv.argstr));
+			0, recv.argstr, strlen(recv.argstr));
 
 	insert((char *) &unique_pid, sizeof(unsigned long long),
 			(char *) &ATTR_ENV_STR, sizeof(unsigned long long), EDGE_ATTR,
-			recv.ts1, recv.env, strlen(recv.env));
+			0, recv.env, strlen(recv.env));
 
 	insert((char *) &unique_pid, sizeof(unsigned long long),
 			(char *) &ATTR_RET_STR, sizeof(unsigned long long), EDGE_ATTR,
-			recv.ts1, recv.retstr, strlen(recv.retstr));
+			0, recv.retstr, strlen(recv.retstr));
 
 	insert((char *) &unique_pid, sizeof(unsigned long long),
 			(char *) &ATTR_EXEC_FILE, sizeof(unsigned long long), EDGE_ATTR,
-			recv.ts1, recv.execfile, strlen(recv.execfile));
+			0, recv.execfile, strlen(recv.execfile));
 
 	char sts1[32], sts2[32];
 	sprintf(sts1, "%lld", recv.ts1);
@@ -86,10 +87,10 @@ static void builder_process_exit_handler(alps_message recv) {
 
 	insert((char *) &unique_pid, sizeof(unsigned long long),
 			(char *) &ATTR_START_TS, sizeof(unsigned long long), EDGE_ATTR,
-			recv.ts1, sts1, strlen(sts1));
+			0, sts1, strlen(sts1));
 	insert((char *) &unique_pid, sizeof(unsigned long long),
 			(char *) &ATTR_END_TS, sizeof(unsigned long long), EDGE_ATTR,
-			recv.ts1, sts2, strlen(sts2));
+			0, sts2, strlen(sts2));
 }
 
 static void builder_file_event_handler(int event, alps_message recv, int rank,
