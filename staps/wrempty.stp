@@ -1,4 +1,6 @@
 global pidmap;
+global firstr, firstw;
+global lastr, lastw;
 
 %{
 #include <linux/file.h>
@@ -77,6 +79,7 @@ probe syscall.exit_group
   if (filtout_richfs(execname())) next;
   if (filtout_p()) next;
   delete pidmap[pid()];
+  
   printf("%c%d %d\n", 98, pid(), gettimeofday_ms());
 }
 
@@ -119,73 +122,73 @@ probe kernel.function("sys_close")
   if (filtout_p()) next;
 
   try {
-  	filename=task_file_handle_d_path(task_current(), $fd);
-  	if (filename == "") filename = "UNDEFINED";
-	  printf("%c%d %d %s %d\n", 104, pid(), gettimeofday_ms(), filename, $fd);
+  	
+	fr_ts = 0;
+	lr_ts = 0;
+	fw_ts = 0;
+	lw_ts = 0;
+	
+	# First Read
+	if ([pid(), $fd] in firstr){
+		fr_ts = firstr[pid(), $fd];
+		delete firstr[pid(), $fd];
+	}
+	# First Write
+	if ([pid(), $fd] in firstw) {
+		fw_ts = firstw[pid(), $fd];
+		delete firstw[pid(), $fd];
+	}
+	# Last Read
+    if ([pid(), $fd] in lastr){
+    	lr_ts = lastr[pid(), $fd];
+    	delete lastr[pid(), $fd];
+    }
+	# Last Write
+    if ([pid(), $fd] in lastw){
+    	lw_ts = lastw[pid(), $fd];
+    	delete lastw[pid(), $fd];
+    }
+    
+	printf("%c%d %d %d %d %d %d %d\n", 105, pid(), gettimeofday_ms(), $fd, fr_ts, lr_ts, fw_ts, lw_ts);
+    	
   } catch (msg) {
-  	printf("%c%d %d %s %d\n", 104, pid(), gettimeofday_ms(), msg, $fd);
-  }
-}
-
-probe syscall.read
-{
-  if (filtout_richfs(execname())) next;
-  if (filtout_p()) next;
-
-  try {
-	#filename=task_file_handle_d_path(task_current(), $fd);
-    printf("%c%d %d %d\n", 108, pid(), gettimeofday_ms(), $fd);
-  } catch (msg) {
-    printf("%c%d %d %s\n", 120, pid(), gettimeofday_ms(), msg);
+  	printf("%c%d %d %d %d %d %d %d %s\n", 120, pid(), gettimeofday_ms(), $fd, fr_ts, lr_ts, fw_ts, lw_ts, msg);
   }
 }
 
 #probe vfs.read.return
 probe syscall.read.return
 {
-  if (filtout_richfs(execname())) next;
+  //if (filtout_richfs(execname())) next;
   if (filtout_p()) next;
 
   try {
     if ($return > 0) {
- 	  #filename=task_file_handle_d_path(task_current(), $fd);
-      printf("%c%d %d %d\n", 109, pid(), gettimeofday_ms(), $fd);
+      ts = gettimeofday_ms();
+      //lastr[pid(), $fd] = ts
+//    if (!([pid(), $fd] in firstr))
+    	//	firstr[pid(), $fd] = ts;
     }
   } catch (msg) {
     printf("%c%d %d %s\n", 120, pid(), gettimeofday_ms(), msg);
   }
 }
 
-probe syscall.write
-{
-  if (filtout_richfs(execname())) next;
-  if (filtout_p()) next;
-
-  try {
-	#filename=task_file_handle_d_path(task_current(), $fd);
-    printf("%c%d %d %d\n", 110, pid(), gettimeofday_ms(), $fd);
-  } catch (msg) {
-    printf("%c%d %d %s\n", 120, pid(), gettimeofday_ms(), msg);
-  }
-}
 
 #probe vfs.write.return
 probe syscall.write.return
 {
-  if (filtout_richfs(execname())) next;
+  //if (filtout_richfs(execname())) next;
   if (filtout_p()) next;
 
   try {
     if ($return > 0){
-	  #filename=task_file_handle_d_path(task_current(), $fd);
-      printf("%c%d %d %d\n", 111, pid(), gettimeofday_ms(), $fd);
+      ts = gettimeofday_ms();
+      //lastw[pid(), $fd] = ts;
+		//    if (!([pid(), $fd] in firstw))
+    	//	firstw[pid(), $fd] = ts;
     }
   } catch (msg) {
     printf("%c%d %d %s\n", 120, pid(), gettimeofday_ms(), msg);
   }
 }
-
-
-
-
-

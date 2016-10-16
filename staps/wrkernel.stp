@@ -156,60 +156,64 @@ probe kernel.function("sys_close")
   }
 }
 
-probe syscall.read
-{
-  if (filtout_richfs(execname())) next;
-  if (filtout_p()) next;
-
-  try {
-	ts = gettimeofday_ms();
-	if (!([pid(), $fd] in firstr))
-		firstr[pid(), $fd] = ts;
-  } catch (msg) {
-    printf("%c%d %d %s\n", 120, pid(), gettimeofday_ms(), msg);
-  }
-}
+#probe syscall.read
+#{
+#  if (filtout_richfs(execname())) next;
+#  if (filtout_p()) next;
+#
+#  try {
+#	ts = gettimeofday_ms();
+#	if (!([pid(), $fd] in firstr))
+#		firstr[pid(), $fd] = ts;
+#  } catch (msg) {
+#    printf("%c%d %d %s\n", 120, pid(), gettimeofday_ms(), msg);
+#  }
+#}
 
 #probe vfs.read.return
 probe syscall.read.return
 {
-  if (filtout_richfs(execname())) next;
+  //if (filtout_richfs(execname())) next;
   if (filtout_p()) next;
 
   try {
     if ($return > 0) {
       ts = gettimeofday_ms();
       lastr[pid(), $fd] = ts
+      if (!([pid(), $fd] in firstr))
+     	firstr[pid(), $fd] = ts;
     }
   } catch (msg) {
     printf("%c%d %d %s\n", 120, pid(), gettimeofday_ms(), msg);
   }
 }
 
-probe syscall.write
-{
-  if (filtout_richfs(execname())) next;
-  if (filtout_p()) next;
-
-  try {
-	ts = gettimeofday_ms();
-	if (!([pid(), $fd] in firstw))
-		firstw[pid(), $fd] = ts;
-  } catch (msg) {
-    printf("%c%d %d %s\n", 120, pid(), gettimeofday_ms(), msg);
-  }
-}
+#probe syscall.write
+#{
+#  if (filtout_richfs(execname())) next;
+#  if (filtout_p()) next;
+#
+#  try {
+#	ts = gettimeofday_ms();
+#	if (!([pid(), $fd] in firstw))
+#		firstw[pid(), $fd] = ts;
+#  } catch (msg) {
+#    printf("%c%d %d %s\n", 120, pid(), gettimeofday_ms(), msg);
+#  }
+#}
 
 #probe vfs.write.return
 probe syscall.write.return
 {
-  if (filtout_richfs(execname())) next;
+  //if (filtout_richfs(execname())) next;
   if (filtout_p()) next;
 
   try {
     if ($return > 0){
       ts = gettimeofday_ms();
       lastw[pid(), $fd] = ts;
+      if (!([pid(), $fd] in firstw))
+      	firstw[pid(), $fd] = ts;
     }
   } catch (msg) {
     printf("%c%d %d %s\n", 120, pid(), gettimeofday_ms(), msg);
