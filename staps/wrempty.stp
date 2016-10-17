@@ -160,7 +160,7 @@ probe kernel.function("sys_close")
 probe syscall.read.return
 {
   //if (filtout_richfs(execname())) next;
-  if (filtout_p()) next;
+  //if (filtout_p()) next;
 
   try {
     if ($return > 0) {
@@ -179,7 +179,7 @@ probe syscall.read.return
 probe syscall.write.return
 {
   //if (filtout_richfs(execname())) next;
-  if (filtout_p()) next;
+  //if (filtout_p()) next;
 
   try {
     if ($return > 0){
