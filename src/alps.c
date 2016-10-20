@@ -29,9 +29,9 @@ static unsigned long long UNIQUE_FID(char *file, int rank) {
 }
 
 //			|| strstr(file, "/tmp/") == file
+//			|| strstr(file, "/dev/") == file
 static int filter_pipe_file(char *file) {
 	if (strstr(file, "pipe:") == file || strstr(file, "UNDEFINED") == file
-			|| strstr(file, "/dev/") == file
 			|| strstr(file, "anon_inode") == file
 			|| strstr(file, "socket:") == file
 			|| strstr(file, "/proc/") == file)
@@ -307,7 +307,7 @@ int main(int argc, char **argv) {
 
 	if (rank < ALPS_DIVIDE) {
 
-		const char *fifo_name = "/tmp/test.out"; //this must be a FIFO file
+		const char *fifo_name = "/tmp/ramdisk/test.out"; //this must be a FIFO file
 
 		FILE *pipe_fd;
 		size_t len = 0;
