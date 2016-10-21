@@ -1,4 +1,5 @@
 global pidmap;
+global outsize;
 
 %{
 #include <linux/file.h>
@@ -67,6 +68,10 @@ probe kprocess.create
   if (filtout_richfs(execname())) next;
   pidmap[new_pid] = 1;
   # new_pid = new process Id; pid() = current process Id,
+  pstr = sprintf("%c%d %d %d\n", 97, new_pid, gettimeofday_ms(), pid());
+  outsize += 1;
+# outsize += strlen(pstr);
+# printf("%s", pstr);
   printf("%c%d %d %d\n", 97, new_pid, gettimeofday_ms(), pid());
 }
 
@@ -75,6 +80,10 @@ probe syscall.exit_group
   if (filtout_richfs(execname())) next;
   if (filtout_p()) next;
   delete pidmap[pid()];
+  pstr = sprintf("%c%d %d\n", 98, pid(), gettimeofday_ms());
+  outsize += 1;
+# outsize += strlen(pstr);
+# printf("%s", pstr);
   printf("%c%d %d\n", 98, pid(), gettimeofday_ms());
 }
 
@@ -82,7 +91,11 @@ probe nd_syscall.execve
 {
   if (filtout_richfs(execname())) next;
   if (filtout_p()) next;
-  env = sprintf("PBS_JOBID=%s;PBS_JOBNAME=%s;PBS_JOBCOOKIE=%s", env_var("PBS_JOBID"), env_var("PBS_JOBNAME"), env_var("PBS_JOBCOOKIE"));
+  env = sprintf("PBS_JOBID=%s", env_var("PBS_JOBID"));
+  pstr = sprintf("%c%d %d %s %s %s %s %s\n", 99, pid(), gettimeofday_ms(), execname(), argstr, env, filename, args);
+  outsize += 1;
+# outsize += strlen(pstr);
+# printf("%s", pstr);
   printf("%c%d %d %s %s %s %s %s\n", 99, pid(), gettimeofday_ms(), execname(), argstr, env, filename, args);
 }
 
@@ -90,7 +103,11 @@ probe nd_syscall.execve.return
 {
   if (filtout_richfs(execname())) next;
   if (filtout_p()) next;
-  env = sprintf("PBS_JOBID=%s;PBS_JOBNAME=%s;PBS_JOBCOOKIE=%s", env_var("PBS_JOBID"), env_var("PBS_JOBNAME"), env_var("PBS_JOBCOOKIE"));
+  env = sprintf("PBS_JOBID=%s", env_var("PBS_JOBID"));
+  pstr = sprintf("%c%d %d %s %s\n", 100, pid(), gettimeofday_ms(), retstr, env);
+  outsize += 1;
+# outsize += strlen(pstr);
+# printf("%s", pstr);
   printf("%c%d %d %s %s\n", 100, pid(), gettimeofday_ms(), retstr, env);
 }
 
@@ -105,6 +122,10 @@ probe kernel.function("do_sys_open").return
   {
     filename=task_file_handle_d_path(task_current(), $return); #$return is the fd
     if (filename == "") filename = "UNDEFINED";
+    pstr = sprintf("%c%d %d %s %d %d\n", 101, pid(), gettimeofday_ms(), filename, $return, $flags);
+    outsize += 1;
+#   outsize += strlen(pstr);
+#   printf("%s", pstr);
     printf("%c%d %d %s %d %d\n", 101, pid(), gettimeofday_ms(), filename, $return, $flags);
   }
 }
@@ -118,8 +139,19 @@ probe kernel.function("sys_close")
   try {
 	#filename=task_file_handle_d_path(task_current(), $fd);
 	#if (filename == "") filename = "UNDEFINED";
+	pstr = sprintf("%c%d %d %d %s\n", 104, pid(), gettimeofday_ms(), $fd, msg);
+	outsize += 1;
+#   outsize += strlen(pstr);
+#   printf("%s", pstr);
 	printf("%c%d %d %d\n", 104, pid(), gettimeofday_ms(), $fd);
   } catch (msg) {
   	printf("%c%d %d %d %s\n", 104, pid(), gettimeofday_ms(), $fd, msg);
   }
+}
+
+#probe timer to output outsize
+probe timer.ms(1)
+{
+	if (outsize != 0)
+		printf("%d\t%d\n", gettimeofday_ms(), outsize);
 }

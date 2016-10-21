@@ -1,6 +1,7 @@
 global pidmap;
 global firstr, firstw;
 global lastr, lastw;
+global gcounter;
 
 %{
 #include <linux/file.h>
@@ -70,7 +71,6 @@ probe kprocess.create
   if (filtout_richfs(execname())) next;
   pidmap[new_pid] = 1;
   
-  # new_pid = new process Id; pid() = current process Id,
   printf("%c%d %d %d\n", 97, new_pid, gettimeofday_ms(), pid());
 }
 
@@ -104,6 +104,7 @@ probe nd_syscall.execve.return
 #probe kernel.function("do_filp_open").return
 probe kernel.function("do_sys_open").return
 {
+  gcounter += 1;
   if (filtout_richfs(execname())) next;
   if (filtout_p()) next;
   
@@ -118,6 +119,7 @@ probe kernel.function("do_sys_open").return
 #probe syscall.close
 probe kernel.function("sys_close")
 {
+  gcounter += 1;
   if (filtout_richfs(execname())) next;
   if (filtout_p()) next;
 
@@ -152,7 +154,7 @@ probe kernel.function("sys_close")
 	printf("%c%d %d %d %d %d %d %d\n", 105, pid(), gettimeofday_ms(), $fd, fr_ts, lr_ts, fw_ts, lw_ts);
     	
   } catch (msg) {
-  	printf("%c%d %d %d %d %d %d %d %s\n", 120, pid(), gettimeofday_ms(), $fd, fr_ts, lr_ts, fw_ts, lw_ts, msg);
+	printf("%c%d %d %d %d %d %d %d %s\n", 120, pid(), gettimeofday_ms(), $fd, fr_ts, lr_ts, fw_ts, lw_ts, msg);
   }
 }
 
@@ -174,6 +176,7 @@ probe kernel.function("sys_close")
 probe syscall.read.return
 {
   //if (filtout_richfs(execname())) next;
+  gcounter += 1;
   if (filtout_p()) next;
 
   try {
@@ -206,6 +209,7 @@ probe syscall.read.return
 probe syscall.write.return
 {
   //if (filtout_richfs(execname())) next;
+  gcounter += 1;
   if (filtout_p()) next;
 
   try {
@@ -220,7 +224,12 @@ probe syscall.write.return
   }
 }
 
-
+#probe timer to output outsize
+probe timer.ms(1)
+{
+	printf("%d\t%d\n", gettimeofday_ms(), gcounter);
+	gcounter = 0;
+}
 
 
 
