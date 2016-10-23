@@ -29,12 +29,16 @@ static unsigned long long UNIQUE_FID(char *file, int rank) {
 }
 
 //			|| strstr(file, "/tmp/") == file
-//			|| strstr(file, "/dev/") == file
 static int filter_pipe_file(char *file) {
-	if (strstr(file, "pipe:") == file || strstr(file, "UNDEFINED") == file
+	if (strstr(file, "pipe:") == file
+			|| strstr(file, "UNDEFINED") == file
 			|| strstr(file, "anon_inode") == file
 			|| strstr(file, "socket:") == file
-			|| strstr(file, "/proc/") == file)
+			|| strstr(file, "/proc/") == file
+			|| strstr(file, "/dev/") == file
+			|| strstr(file, "/usr/") == file
+			|| strstr(file, "/etc/") == file
+			|| strstr(file, "/run/") == file)
 		return 0;
 	else
 		return 1;
