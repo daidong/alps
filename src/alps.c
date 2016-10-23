@@ -38,7 +38,8 @@ static int filter_pipe_file(char *file) {
 			|| strstr(file, "/dev/") == file
 			|| strstr(file, "/usr/") == file
 			|| strstr(file, "/etc/") == file
-			|| strstr(file, "/run/") == file)
+			|| strstr(file, "/run/") == file
+			|| strstr(file, "/var/") == file)
 		return 0;
 	else
 		return 1;
